@@ -4,7 +4,7 @@ import urllib.parse
 import urllib.request
 import sys
 import json
-from explo_data.RegionMapData import regions, regionmap
+from .RegionMapData import regions, regionmap
 
 x0 = -49985
 y0 = -40985

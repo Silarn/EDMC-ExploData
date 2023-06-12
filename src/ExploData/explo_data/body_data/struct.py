@@ -2,7 +2,7 @@ from typing import Self, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from explo_data.db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star
+from ...explo_data.db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star
 
 
 class PlanetData:
@@ -221,6 +221,10 @@ class PlanetData:
     def commit(self) -> None:
         self._session.commit()
 
+    def refresh(self) -> None:
+        self._session.refresh(self._system)
+        self._session.refresh(self._data)
+
     def __del__(self) -> None:
         self.commit()
 
@@ -277,6 +281,10 @@ class StarData:
         self._data.luminosity = value
         self.commit()
         return self
+
+    def refresh(self) -> None:
+        self._session.refresh(self._system)
+        self._session.refresh(self._data)
 
     def commit(self) -> None:
         self._session.commit()

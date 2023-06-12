@@ -13,7 +13,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql.ddl import CreateTable
 
-from explo_data.const import database_version
+from .const import database_version
 
 from EDMCLogging import get_plugin_logger
 from config import config

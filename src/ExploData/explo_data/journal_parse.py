@@ -10,7 +10,7 @@ from os.path import expanduser
 from pathlib import Path
 from time import sleep
 from threading import Event
-from typing import Any, BinaryIO, MutableMapping, Optional, Callable
+from typing import Any, BinaryIO, Callable, Mapping, Optional
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError as AlcIntegrityError
@@ -19,10 +19,10 @@ from sqlite3 import IntegrityError
 
 from EDMCLogging import get_plugin_logger
 from config import config
-from explo_data.RegionMap import findRegion
-from explo_data.bio_data.codex import parse_variant, set_codex
-from explo_data.db import System, Commander, Planet, JournalLog, get_session
-from explo_data.body_data.struct import PlanetData, StarData
+from .RegionMap import findRegion
+from .bio_data.codex import parse_variant, set_codex
+from .db import System, Commander, Planet, JournalLog, get_session
+from .body_data.struct import PlanetData, StarData
 
 JOURNAL_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.[0-9]{2,4}-?[0-9]{2}-?[0-9]{2}T?[0-9]{2}[0-9]{2}[0-9]{2}'
                            r'\.[0-9]{2}\.log$')
@@ -44,7 +44,8 @@ class This:
         self.journal_progress: float = 0.0
         self.journal_error: bool = False
 
-        self.bound_events: dict[str, tk.Frame] = {}
+        self.journal_processing_callbacks: dict[str, tk.Frame] = {}
+        self.event_callbacks: dict[str, set[Callable]] = {}
 
 
 this = This()
@@ -52,18 +53,17 @@ logger = get_plugin_logger('this.NAME')
 
 
 class JournalParse:
-    def __init__(self, journal: Path):
-        self._journal: Path = journal
-        self._session: Session = get_session()
+    def __init__(self, session: Session):
+        self._session: Session = session
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
 
-    def parse_journal(self, event: Event) -> bool:
+    def parse_journal(self, journal: Path, event: Event) -> bool:
         if event.is_set():
             return False
-        found = self._session.scalar(select(JournalLog).where(JournalLog.journal == self._journal.name))
+        found = self._session.scalar(select(JournalLog).where(JournalLog.journal == journal.name))
         if not found:
-            log: BinaryIO = open(self._journal, 'rb', 0)
+            log: BinaryIO = open(journal, 'rb', 0)
             for line in log:
                 retry = 2
                 while True:
@@ -78,7 +78,7 @@ class JournalParse:
             self._session.expunge(found)
             return True
 
-        journal = JournalLog(journal=self._journal.name)
+        journal = JournalLog(journal=journal.name)
         try:
             self._session.add(journal)
             self._session.commit()
@@ -91,14 +91,14 @@ class JournalParse:
             return False
 
         try:
-            entry: MutableMapping[str, Any] = json.loads(line)
+            entry: Mapping[str, Any] = json.loads(line)
             self.process_entry(entry)
         except Exception as ex:
             logger.error(f'Invalid journal entry:\n{line!r}\n', exc_info=ex)
             return False
         return True
 
-    def process_entry(self, entry: MutableMapping[str, Any]):
+    def process_entry(self, entry: Mapping[str, Any]):
         event_type = entry['event'].lower()
         match event_type:
             case 'loadgame':
@@ -157,7 +157,11 @@ class JournalParse:
         return body_name
 
     def set_cmdr(self, name: str) -> None:
+        self._session.commit()
+        self._session.close()
+
         self._cmdr = self._session.scalar(select(Commander).where(Commander.name == name))
+
         if not self._cmdr:
             self._cmdr = Commander(name=name)
             self._session.add(self._cmdr)
@@ -178,7 +182,7 @@ class JournalParse:
             self._system.region = region[0]
         self._session.commit()
 
-    def add_star(self, entry: MutableMapping[str, Any]) -> None:
+    def add_star(self, entry: Mapping[str, Any]) -> None:
         """
         Add main star data from journal event
 
@@ -192,7 +196,7 @@ class JournalParse:
             .set_type(entry['StarType']) \
             .set_luminosity(entry['Luminosity'])
 
-    def add_planet(self, entry: MutableMapping[str, Any]) -> None:
+    def add_planet(self, entry: Mapping[str, Any]) -> None:
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
@@ -217,7 +221,7 @@ class JournalParse:
             for gas in entry['AtmosphereComposition']:
                 body_data.add_gas(gas['Name'], gas['Percent'])
 
-    def add_signals(self, entry: MutableMapping[str, Any]) -> None:
+    def add_signals(self, entry: Mapping[str, Any]) -> None:
         body_short_name = self.get_body_name(entry['BodyName'])
 
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
@@ -233,7 +237,7 @@ class JournalParse:
                 if body_data.get_flora(genus['Genus']) is None:
                     body_data.add_flora(genus['Genus'])
 
-    def add_scan(self, entry: MutableMapping[str, Any]) -> None:
+    def add_scan(self, entry: Mapping[str, Any]) -> None:
         self._system = self._session.merge(self._system)
         self._cmdr = self._session.merge(self._cmdr)
         planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
@@ -263,7 +267,7 @@ class JournalParse:
 
 
 def parse_journal(journal: Path, event: Event) -> bool:
-    return JournalParse(journal).parse_journal(event)
+    return JournalParse(get_session()).parse_journal(journal, event)
 
 
 def parse_journals() -> None:
@@ -354,9 +358,9 @@ def journal_worker() -> None:
     fire_finish_event()
 
 
-def register_callbacks(frame: tk.Frame, event_name: str, start_func: Optional[Callable],
-                       update_func: Optional[Callable], stop_func: Optional[Callable]) -> None:
-    this.bound_events[event_name] = frame
+def register_journal_callbacks(frame: tk.Frame, event_name: str, start_func: Optional[Callable],
+                               update_func: Optional[Callable], stop_func: Optional[Callable]) -> None:
+    this.journal_processing_callbacks[event_name] = frame
     if start_func:
         frame.bind(f'<<{event_name}_journal_start>>', start_func)
     if update_func:
@@ -366,18 +370,34 @@ def register_callbacks(frame: tk.Frame, event_name: str, start_func: Optional[Ca
 
 
 def fire_start_event() -> None:
-    for name, frame in this.bound_events.items():
+    for name, frame in this.journal_processing_callbacks.items():
         frame.event_generate(f'<<{name}_journal_start>>')
 
 
 def fire_progress_event() -> None:
-    for name, frame in this.bound_events.items():
+    for name, frame in this.journal_processing_callbacks.items():
         frame.event_generate(f'<<{name}_journal_progress>>')
 
 
 def fire_finish_event() -> None:
-    for name, frame in this.bound_events.items():
+    for name, frame in this.journal_processing_callbacks.items():
         frame.event_generate(f'<<{name}_journal_finish>>')
+
+
+def register_event_callbacks(events: set[str], func: Callable) -> None:
+    for event in events:
+        callbacks = this.event_callbacks.get('event', set())
+        callbacks.add(func)
+        this.event_callbacks[event] = callbacks
+
+
+def fire_event_callbacks(entry: Mapping[str, Any]):
+    if entry['event'] in this.event_callbacks:
+        for func in this.event_callbacks[entry['event']]:
+            try:
+                func(entry)
+            except Exception as ex:
+                logger.error('Event callback failed', exc_info=ex)
 
 
 def has_error() -> bool:
