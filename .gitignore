@@ -1,0 +1,11 @@
+.DS_Store
+*.bak
+*.pyc
+*.pyo
+*.zip
+.idea
+venv
+
+# Release prep
+EDMC-BioScan/
+/*.zip
