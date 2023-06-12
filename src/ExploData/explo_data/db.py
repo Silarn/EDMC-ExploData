@@ -7,8 +7,8 @@ from sqlite3 import OperationalError
 from typing import Optional
 
 import sqlalchemy.exc
-from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, SmallInteger, \
-    Table, MetaData, Executable, Result, create_engine
+from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Table, \
+    MetaData, Executable, Result, create_engine, Boolean
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql.ddl import CreateTable
@@ -18,7 +18,6 @@ from .const import database_version
 from EDMCLogging import get_plugin_logger
 from config import config
 
-version: int = 2
 logger = get_plugin_logger('BioScan')
 
 
@@ -54,8 +53,8 @@ class Commander(Base):
 class Metadata(Base):
     __tablename__ = 'metadata'
 
-    key: Mapped[str] = mapped_column(nullable=False, primary_key=True)
-    value: Mapped[str] = mapped_column(nullable=False, default='')
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[str] = mapped_column(default='')
 
 
 class System(Base):
@@ -64,10 +63,15 @@ class System(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
+    statuses: Mapped[list['SystemStatus']] = relationship(
+        back_populates='status', cascade='all, delete-orphan'
+    )
     x: Mapped[float] = mapped_column(default=0.0)
     y: Mapped[float] = mapped_column(default=0.0)
     z: Mapped[float] = mapped_column(default=0.0)
-    region: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    region: Mapped[Optional[int]]
+    body_count: Mapped[int] = mapped_column(default=1)
+    non_body_count: Mapped[int] = mapped_column(default=0)
 
     planets: Mapped[list['Planet']] = relationship(
         back_populates='planet', cascade='all, delete-orphan'
@@ -76,6 +80,16 @@ class System(Base):
     stars: Mapped[list['Star']] = relationship(
         back_populates='star', cascade='all, delete-orphan'
     )
+
+
+class SystemStatus(Base):
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id'))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
+    status: Mapped['System'] = relationship(back_populates='statuses')
+    honked: Mapped[bool] = mapped_column(default=False)
+    fully_scanned: Mapped[bool] = mapped_column(default=False)
+    fully_mapped: Mapped[bool] = mapped_column(default=False)
 
 
 class Planet(Base):
@@ -88,12 +102,16 @@ class Planet(Base):
     name: Mapped[str] = mapped_column(String(32))
     type: Mapped[str] = mapped_column(String(32), default='')
     body_id: Mapped[int]
+    statuses: Mapped[list['PlanetStatus']] = relationship(
+        back_populates='status', cascade='all, delete-orphan'
+    )
     atmosphere: Mapped[str] = mapped_column(String(32), default='')
     gasses: Mapped[list['PlanetGas']] = relationship(
         back_populates='gas', cascade='all, delete-orphan'
     )
     volcanism: Mapped[Optional[str]] = mapped_column(String(32))
     distance: Mapped[float] = mapped_column(default=0.0)
+    mass: Mapped[float] = mapped_column(default=0.0)
     gravity: Mapped[float] = mapped_column(default=0.0)
     temp: Mapped[Optional[float]]
     parent_stars: Mapped[str] = mapped_column(default='')
@@ -102,7 +120,19 @@ class Planet(Base):
         back_populates='flora', cascade='all, delete-orphan'
     )
     materials: Mapped[str] = mapped_column(default='')
+    terraform_state: Mapped[str] = mapped_column(default='')
+
+
+class PlanetStatus(Base):
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id'))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
+    status: Mapped['Planet'] = relationship(back_populates='statuses')
+    discovered: Mapped[bool] = mapped_column(default=True)
+    was_discovered: Mapped[bool] = mapped_column(default=False)
     mapped: Mapped[bool] = mapped_column(default=False)
+    was_mapped: Mapped[bool] = mapped_column(default=False)
+    efficient: Mapped[bool] = mapped_column(default=False)
 
 
 class PlanetGas(Base):
@@ -153,9 +183,9 @@ class Waypoint(Base):
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
     flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id'))
     waypoint: Mapped['PlanetFlora'] = relationship(back_populates='waypoints')
-    type: Mapped[str] = mapped_column(nullable=False, default='tag')
-    latitude: Mapped[float] = mapped_column(nullable=False)
-    longitude: Mapped[float] = mapped_column(nullable=False)
+    type: Mapped[str] = mapped_column(default='tag')
+    latitude: Mapped[float]
+    longitude: Mapped[float]
 
 
 class Star(Base):
@@ -165,11 +195,25 @@ class Star(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     system_id: Mapped[int] = mapped_column(ForeignKey('systems.id'))
     star: Mapped[list['System']] = relationship(back_populates='stars')
-    name: Mapped[str] = mapped_column(nullable=False)
-    body_id: Mapped[int] = mapped_column(nullable=False)
-    distance: Mapped[float] = mapped_column(nullable=True)
+    name: Mapped[str]
+    body_id: Mapped[int]
+    statuses: Mapped[list['StarStatus']] = relationship(
+        back_populates='status', cascade='all, delete-orphan'
+    )
+    distance: Mapped[Optional[float]]
+    mass: Mapped[Optional[float]]
     type: Mapped[str] = mapped_column(default='')
+    subclass: Mapped[int] = mapped_column(default=0)
     luminosity: Mapped[str] = mapped_column(default='')
+
+
+class StarStatus(Base):
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    star_id: Mapped[int] = mapped_column(ForeignKey('stars.id'))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
+    status: Mapped['Star'] = relationship(back_populates='statuses')
+    discovered: Mapped[bool] = mapped_column(default=True)
+    was_discovered: Mapped[bool] = mapped_column(default=False)
 
 
 class CodexScans(Base):
@@ -177,8 +221,8 @@ class CodexScans(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
-    region: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    biological: Mapped[str] = mapped_column(nullable=False, default='')
+    region: Mapped[int]
+    biological: Mapped[str] = mapped_column(default='')
     __table_args__ = (UniqueConstraint('commander_id', 'region', 'biological', name='_cmdr_bio_region_constraint'),)
 
 
@@ -264,11 +308,21 @@ WHERE ROWID IN
                 add_column(engine, 'systems', Column('x', Float(), default=0.0))
                 add_column(engine, 'systems', Column('y', Float(), default=0.0))
                 add_column(engine, 'systems', Column('z', Float(), default=0.0))
-                add_column(engine, 'systems', Column('region', SmallInteger(), nullable=True))
+                add_column(engine, 'systems', Column('region', Integer(), nullable=True))
                 add_column(engine, 'stars', Column('distance', Float(), nullable=True))
                 modify_table(engine, Star)
                 modify_table(engine, Planet)
                 modify_table(engine, PlanetGas)
+            if int(version['value']) < 3:
+                add_column(engine, 'systems', Column('body_count', Integer(), default=1))
+                add_column(engine, 'systems', Column('non_body_count', Integer(), default=0))
+                add_column(engine, 'stars', Column('subclass', Integer(), default=0))
+                add_column(engine, 'stars', Column('mass', Float(), default=0.0))
+                add_column(engine, 'planets', Column('mass', Float(), default=0.0))
+                add_column(engine, 'planets', Column('terraform_state', String(), default=''))
+                modify_table(engine, System)
+                modify_table(engine, Star)
+                modify_table(engine, Planet)
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
                       .on_conflict_do_update(index_elements=['key'], set_=dict(value=1)))

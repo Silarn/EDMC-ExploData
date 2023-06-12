@@ -21,7 +21,7 @@ from EDMCLogging import get_plugin_logger
 from config import config
 from .RegionMap import findRegion
 from .bio_data.codex import parse_variant, set_codex
-from .db import System, Commander, Planet, JournalLog, get_session
+from .db import System, Commander, Planet, JournalLog, get_session, PlanetStatus, SystemStatus
 from .body_data.struct import PlanetData, StarData
 
 JOURNAL_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.[0-9]{2,4}-?[0-9]{2}-?[0-9]{2}T?[0-9]{2}[0-9]{2}[0-9]{2}'
@@ -111,17 +111,52 @@ class JournalParse:
                 self._session.close()
                 self.set_system(entry['StarSystem'], entry.get('StarPos', None))
             case 'scan':
-                body_short_name = self.get_body_name(entry['BodyName'])
                 if 'StarType' in entry:
-                    if body_short_name == entry['BodyName']:
-                        self.add_star(entry)
-                    else:
-                        if re.search('^[A-Z]$', body_short_name):
-                            self.add_star(entry)
+                    self.add_star(entry)
                 elif 'PlanetClass' in entry:
                     self.add_planet(entry)
+            case 'fssdiscoveryscan':
+                self._system = self._session.merge(self._system)
+                self._cmdr = self._session.merge(self._cmdr)
+                statuses: list[SystemStatus] = self._system.statuses
+                statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
+                if len(statuses):
+                    status = statuses[0]
+                else:
+                    status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
+                    self._session.add(status)
+                status.honked = True
+                self._system.body_count = entry['BodyCount']
+                self._system.non_body_count = entry['NonBodyCount']
+                if entry['Progress'] == 1.0:
+                    status.fully_scanned = True
+                self._session.commit()
             case 'fssbodysignals' | 'saasignalsfound':
                 self.add_signals(entry)
+            case 'fssallbodiesfound':
+                self._system = self._session.merge(self._system)
+                self._cmdr = self._session.merge(self._cmdr)
+                statuses: list[SystemStatus] = self._system.statuses
+                statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
+                if len(statuses):
+                    status = statuses[0]
+                else:
+                    status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
+                    self._session.add(status)
+                status.fully_scanned = True
+                self._session.commit()
+            case 'saascancomplete':
+                self._system = self._session.merge(self._system)
+                self._cmdr = self._session.merge(self._cmdr)
+                body_short_name = self.get_body_name(entry['BodyName'])
+                planet: PlanetData = PlanetData.from_journal(self._system, body_short_name,
+                                                             entry['BodyID'], self._session)
+                target = int(entry['EfficiencyTarget'])
+                used = int(entry['ProbesUsed'])
+                status = planet.get_status(self._cmdr.id)
+                status.mapped = True
+                status.efficient = target >= used
+                self._session.commit()
             case 'scanorganic':
                 self.add_scan(entry)
             case 'codexentry':
@@ -192,16 +227,18 @@ class JournalParse:
         body_short_name = self.get_body_name(entry['BodyName'])
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
-        star_data.set_distance(entry['DistanceFromArrivalLS']) \
-            .set_type(entry['StarType']) \
-            .set_luminosity(entry['Luminosity'])
+        star_data.set_distance(entry['DistanceFromArrivalLS']).set_type(entry['StarType']) \
+            .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity']) \
+            .set_discovered(True).set_was_discovered(entry['WasDiscovered'])
 
     def add_planet(self, entry: Mapping[str, Any]) -> None:
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
-            .set_gravity(entry['SurfaceGravity']).set_temp(entry.get('SurfaceTemperature', None)) \
-            .set_volcanism(entry.get('Volcanism', None))
+            .set_mass(entry['MassEM']).set_gravity(entry['SurfaceGravity']) \
+            .set_temp(entry.get('SurfaceTemperature', None)).set_volcanism(entry.get('Volcanism', None)) \
+            .set_terraform_state(entry.get('TerraformState', None)).set_discovered(True, self._cmdr.id) \
+            .set_was_discovered(entry['WasDiscovered'], self._cmdr.id).set_was_mapped(entry['WasMapped'], self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
         if star_search:

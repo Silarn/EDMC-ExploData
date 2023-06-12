@@ -2,7 +2,8 @@ from typing import Self, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from ...explo_data.db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star
+from ...explo_data.db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star, PlanetStatus, \
+    StarStatus
 
 
 class PlanetData:
@@ -41,6 +42,16 @@ class PlanetData:
         self._data.body_id = value
         self.commit()
         return self
+
+    def get_status(self, commander_id: int) -> PlanetStatus:
+        statuses: list[PlanetStatus] = self._data.statuses
+        statuses = list(filter(lambda item: item.commander_id == commander_id, statuses))
+        if len(statuses):
+            status = statuses[0]
+        else:
+            status = PlanetStatus(planet_id=self._data.id, commander_id=commander_id)
+            self._session.add(status)
+        return status
 
     def get_atmosphere(self) -> str:
         return self._data.atmosphere
@@ -87,6 +98,14 @@ class PlanetData:
 
     def set_gravity(self, value: float) -> Self:
         self._data.gravity = value
+        self.commit()
+        return self
+
+    def get_mass(self) -> Optional[float]:
+        return self._data.mass
+
+    def set_mass(self, value: float) -> Self:
+        self._data.mass = value
         self.commit()
         return self
 
@@ -211,11 +230,67 @@ class PlanetData:
         self.commit()
         return self
 
-    def is_mapped(self) -> bool:
-        return self._data.mapped
+    def get_terraform_state(self) -> str:
+        return self._data.terraform_state
 
-    def set_mapped(self, value: bool) -> Self:
-        self._data.mapped = value
+    def set_terraform_state(self, value: str) -> Self:
+        self._data.terraform_state = value
+        self.commit()
+        return self
+
+    def is_terraformable(self) -> bool:
+        if self._data.terraform_state and self._data.terraform_state in ['Terraformable', 'Terraforming', 'Terraformed']:
+            return True
+        return False
+
+    def is_discovered(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.discovered
+
+    def set_discovered(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.discovered = value
+        self.commit()
+        return self
+
+    def was_discovered(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.was_discovered
+
+    def set_was_discovered(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.was_discovered = value
+        self.commit()
+        return self
+
+    def is_mapped(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.mapped
+
+    def set_mapped(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.mapped = value
+        self.commit()
+        return self
+
+    def was_mapped(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.was_mapped
+
+    def set_was_mapped(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.was_mapped = value
+        self.commit()
+        return self
+
+    def was_efficient(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.efficient
+
+    def set_efficient(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.efficient = value
+        self.commit()
         return self
 
     def commit(self) -> None:
@@ -258,11 +333,29 @@ class StarData:
     def get_id(self) -> int:
         return self._data.body_id
 
+    def get_status(self, commander_id: int) -> StarStatus:
+        statuses: list[StarStatus] = self._data.statuses
+        statuses = list(filter(lambda item: item.commander_id == commander_id, statuses))
+        if len(statuses):
+            status = statuses[0]
+        else:
+            status = StarStatus(planet_id=self._data.id, commander_id=commander_id)
+            self._session.add(status)
+        return status
+
     def get_distance(self) -> Optional[float]:
         return self._data.distance
 
     def set_distance(self, value: float) -> Self:
         self._data.distance = value
+        self.commit()
+        return self
+
+    def get_mass(self) -> Optional[float]:
+        return self._data.mass
+
+    def set_mass(self, value: float) -> Self:
+        self._data.mass = value
         self.commit()
         return self
 
@@ -274,11 +367,39 @@ class StarData:
         self.commit()
         return self
 
+    def get_subclass(self) -> int:
+        return self._data.subclass
+
+    def set_subclass(self, value: int) -> Self:
+        self._data.subclass = value
+        self.commit()
+        return self
+
     def get_luminosity(self):
         return self._data.luminosity
 
     def set_luminosity(self, value: str) -> Self:
         self._data.luminosity = value
+        self.commit()
+        return self
+
+    def is_discovered(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.discovered
+
+    def set_discovered(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.discovered = value
+        self.commit()
+        return self
+
+    def was_discovered(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.was_discovered
+
+    def set_was_discovered(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.was_discovered = value
         self.commit()
         return self
 
