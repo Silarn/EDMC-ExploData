@@ -241,6 +241,10 @@ class NonBodyStatus(Base):
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     discovered: Mapped[bool] = mapped_column(default=True)
     was_discovered: Mapped[bool] = mapped_column(default=False)
+    mapped: Mapped[bool] = mapped_column(default=True)
+    was_mapped: Mapped[bool] = mapped_column(default=False)
+    efficient: Mapped[bool] = mapped_column(default=False)
+
     __table_args__ = (UniqueConstraint('non_body_id', 'commander_id', name='_nonbody_commander_constraint'),
                       )
 

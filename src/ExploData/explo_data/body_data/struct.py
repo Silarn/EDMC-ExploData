@@ -363,6 +363,36 @@ class NonBodyData:
         self.commit()
         return self
 
+    def is_mapped(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.mapped
+
+    def set_mapped(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.mapped = value
+        self.commit()
+        return self
+
+    def was_mapped(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.was_mapped
+
+    def set_was_mapped(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.was_mapped = value
+        self.commit()
+        return self
+
+    def was_efficient(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.efficient
+
+    def set_efficient(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.efficient = value
+        self.commit()
+        return self
+
     def refresh(self) -> None:
         self._session.refresh(self._system)
         self._session.refresh(self._data)
@@ -485,7 +515,6 @@ class StarData:
 
 
 def load_planets(system: System, session: Session) -> dict[str, PlanetData]:
-    session.refresh(system)
     planet_data: dict[str, PlanetData] = {}
     if system and system.id:
         for planet in system.planets:  # type: Planet
@@ -495,7 +524,6 @@ def load_planets(system: System, session: Session) -> dict[str, PlanetData]:
 
 
 def load_non_bodies(system: System, session: Session) -> dict[str, NonBodyData]:
-    session.refresh(system)
     non_body_data: dict[str, NonBodyData] = {}
     if system and system.id:
         for non_body in system.non_bodies:  # type: NonBody
