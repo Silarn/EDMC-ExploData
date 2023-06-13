@@ -415,10 +415,10 @@ class StarData:
 
 
 def load_planets(system: System, session: Session) -> dict[str, PlanetData]:
+    session.refresh(system)
     planet_data: dict[str, PlanetData] = {}
     if system and system.id:
-        planets = session.scalars(select(Planet).where(Planet.system_id == system.id))
-        for planet in planets:  # type: Planet
+        for planet in system.planets:  # type: Planet
             planet_data[planet.name] = PlanetData(system, planet, session)
     session.commit()
     return planet_data
@@ -427,8 +427,7 @@ def load_planets(system: System, session: Session) -> dict[str, PlanetData]:
 def load_stars(system: System, session: Session) -> dict[str, StarData]:
     star_data: dict[str, StarData] = {}
     if system and system.id:
-        stars = session.scalars(select(Star).where(Star.system_id == system.id))
-        for star in stars:  # type: Star
+        for star in system.stars:  # type: Star
             star_data[star.name] = StarData(system, star, session)
     session.commit()
     return star_data
