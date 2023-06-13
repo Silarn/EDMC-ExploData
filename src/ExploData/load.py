@@ -49,6 +49,7 @@ def plugin_stop():
     EDMC plugin stop function. Closes open threads and database sessions for clean shutdown.
     """
 
+    explo_data.journal_parse.shutdown()
     db.shutdown()
 
 
