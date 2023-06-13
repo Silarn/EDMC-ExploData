@@ -379,7 +379,7 @@ def journal_worker() -> None:
                     this.journal_progress = count / len(journal_files)
                     fire_progress_event()
                     if not future.result() or this.journal_stop:
-                        if not future.result():
+                        if not this.journal_stop:
                             this.journal_error = True
                         this.parsing_journals = False
                         this.journal_event.set()
@@ -435,6 +435,13 @@ def fire_event_callbacks(entry: Mapping[str, Any]):
                 func(entry)
             except Exception as ex:
                 logger.error('Event callback failed', exc_info=ex)
+
+
+def shutdown() -> None:
+    if this.journal_thread and this.journal_thread.is_alive():
+        this.journal_stop = True
+        if this.journal_event:
+            this.journal_event.set()
 
 
 def has_error() -> bool:

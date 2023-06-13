@@ -379,10 +379,6 @@ def init() -> None:
 
 
 def shutdown() -> None:
-    if this.journal_thread and this.journal_thread.is_alive():
-        this.journal_stop = True
-        if this.journal_event:
-            this.journal_event.set()
     try:
         this.sql_session_factory.close()
         this.sql_engine.dispose()
