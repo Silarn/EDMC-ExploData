@@ -293,6 +293,9 @@ class JournalParse:
     def add_signals(self, entry: Mapping[str, Any]) -> None:
         body_short_name = self.get_body_name(entry['BodyName'])
 
+        if body_short_name.endswith('Ring') or body_short_name.find('Belt Cluster') != -1:
+            return
+
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
         # Add bio signal number just in case
