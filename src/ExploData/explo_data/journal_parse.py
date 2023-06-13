@@ -21,7 +21,7 @@ from EDMCLogging import get_plugin_logger
 from config import config
 from .RegionMap import findRegion
 from .bio_data.codex import parse_variant, set_codex
-from .db import System, Commander, Planet, JournalLog, get_session, PlanetStatus, SystemStatus
+from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus
 from .body_data.struct import PlanetData, StarData
 
 JOURNAL_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.[0-9]{2,4}-?[0-9]{2}-?[0-9]{2}T?[0-9]{2}[0-9]{2}[0-9]{2}'
