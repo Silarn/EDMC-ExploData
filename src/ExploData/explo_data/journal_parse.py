@@ -98,7 +98,7 @@ class JournalParse:
             return False
         return True
 
-    def process_entry(self, entry: Mapping[str, Any]):
+    def process_entry(self, entry: Mapping[str, Any]) -> None:
         event_type = entry['event'].lower()
         match event_type:
             case 'loadgame':
@@ -111,13 +111,17 @@ class JournalParse:
                 self._session.close()
                 self.set_system(entry['StarSystem'], entry.get('StarPos', None))
             case 'scan':
+                if not self._system:
+                    return
                 self._system = self._session.merge(self._system)
-                self._cmdr = self._session.merge(self._cmdr)
+                self._cmdr = self._session.merge(self._cmdr) if self._cmdr else None
                 if 'StarType' in entry:
                     self.add_star(entry)
                 elif 'PlanetClass' in entry:
                     self.add_planet(entry)
             case 'fssdiscoveryscan':
+                if not self._system or not self._cmdr:
+                    return
                 self._system = self._session.merge(self._system)
                 self._cmdr = self._session.merge(self._cmdr)
                 status = self.get_system_status()
@@ -128,14 +132,21 @@ class JournalParse:
                     status.fully_scanned = True
                 self._session.commit()
             case 'fssbodysignals' | 'saasignalsfound':
+                if not self._system:
+                    return
+                self._system = self._session.merge(self._system)
                 self.add_signals(entry)
             case 'fssallbodiesfound':
+                if not self._system or not self._cmdr:
+                    return
                 self._system = self._session.merge(self._system)
                 self._cmdr = self._session.merge(self._cmdr)
                 status = self.get_system_status()
                 status.fully_scanned = True
                 self._session.commit()
             case 'saascancomplete':
+                if not self._system or not self._cmdr:
+                    return
                 self._system = self._session.merge(self._system)
                 self._cmdr = self._session.merge(self._cmdr)
                 body_short_name = self.get_body_name(entry['BodyName'])
@@ -143,14 +154,21 @@ class JournalParse:
                                                              entry['BodyID'], self._session)
                 target = int(entry['EfficiencyTarget'])
                 used = int(entry['ProbesUsed'])
-                planet.set_mapped(True, self._cmdr.id).set_efficient(target >= used, self._cmdr.id)
+                planet.set_mapped(True, self._cmdr.id)\
+                    .set_efficient(target >= used, self._cmdr.id)
                 self._session.commit()
             case 'scanorganic':
+                if not self._system or not self._cmdr:
+                    return
+                self._system = self._session.merge(self._system)
+                self._cmdr = self._session.merge(self._cmdr) if self._cmdr else None
                 self.add_scan(entry)
             case 'codexentry':
                 if entry['Category'] == '$Codex_Category_Biology;' and 'BodyID' in entry:
+                    if not self._system or not self._cmdr:
+                        return
                     self._system = self._session.merge(self._system)
-                    self._cmdr = self._session.merge(self._cmdr)
+                    self._cmdr = self._session.merge(self._cmdr) if self._cmdr else None
                     planet: Planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
                                                           .where(Planet.body_id == entry['BodyID']))
                     if not planet:
@@ -162,7 +180,8 @@ class JournalParse:
                     if genus is not '' and species is not '':
                         target_body.add_flora(genus, species, color)
 
-                    set_codex(self._cmdr.id, entry['Name'], self._system.region)
+                    if self._cmdr:
+                        set_codex(self._cmdr.id, entry['Name'], self._system.region)
 
     def get_body_name(self, fullname: str) -> str:
         """
@@ -226,8 +245,9 @@ class JournalParse:
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
         star_data.set_distance(entry['DistanceFromArrivalLS']).set_type(entry['StarType']) \
-            .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity']) \
-            .set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id)
+            .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity'])
+        if self._cmdr:
+            star_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id)
 
     def add_planet(self, entry: Mapping[str, Any]) -> None:
         body_short_name = self.get_body_name(entry['BodyName'])
@@ -235,8 +255,11 @@ class JournalParse:
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
             .set_mass(entry['MassEM']).set_gravity(entry['SurfaceGravity']) \
             .set_temp(entry.get('SurfaceTemperature', None)).set_volcanism(entry.get('Volcanism', None)) \
-            .set_terraform_state(entry.get('TerraformState', '')).set_discovered(True, self._cmdr.id) \
-            .set_was_discovered(entry['WasDiscovered'], self._cmdr.id).set_was_mapped(entry['WasMapped'], self._cmdr.id)
+            .set_terraform_state(entry.get('TerraformState', ''))\
+
+        if self._cmdr:
+            body_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
+                .set_was_mapped(entry['WasMapped'], self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
         if star_search:
@@ -273,8 +296,6 @@ class JournalParse:
                     body_data.add_flora(genus['Genus'])
 
     def add_scan(self, entry: Mapping[str, Any]) -> None:
-        self._system = self._session.merge(self._system)
-        self._cmdr = self._session.merge(self._cmdr)
         planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
                                       .where(Planet.body_id == entry['Body']))
         if not planet:
@@ -291,7 +312,7 @@ class JournalParse:
             case 'Analyse':
                 scan_level = 3
 
-        if scan_level == 3:
+        if scan_level == 3 and self._cmdr:
             target_body.set_flora_species_scan(
                 entry['Genus'], entry['Species'], scan_level, self._cmdr.id
             )
