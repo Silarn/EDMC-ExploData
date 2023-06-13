@@ -111,6 +111,8 @@ class JournalParse:
                 self._session.close()
                 self.set_system(entry['StarSystem'], entry.get('StarPos', None))
             case 'scan':
+                self._system = self._session.merge(self._system)
+                self._cmdr = self._session.merge(self._cmdr)
                 if 'StarType' in entry:
                     self.add_star(entry)
                 elif 'PlanetClass' in entry:
@@ -118,13 +120,7 @@ class JournalParse:
             case 'fssdiscoveryscan':
                 self._system = self._session.merge(self._system)
                 self._cmdr = self._session.merge(self._cmdr)
-                statuses: list[SystemStatus] = self._system.statuses
-                statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
-                if len(statuses):
-                    status = statuses[0]
-                else:
-                    status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
-                    self._session.add(status)
+                status = self.get_system_status()
                 status.honked = True
                 self._system.body_count = entry['BodyCount']
                 self._system.non_body_count = entry['NonBodyCount']
@@ -136,13 +132,7 @@ class JournalParse:
             case 'fssallbodiesfound':
                 self._system = self._session.merge(self._system)
                 self._cmdr = self._session.merge(self._cmdr)
-                statuses: list[SystemStatus] = self._system.statuses
-                statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
-                if len(statuses):
-                    status = statuses[0]
-                else:
-                    status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
-                    self._session.add(status)
+                status = self.get_system_status()
                 status.fully_scanned = True
                 self._session.commit()
             case 'saascancomplete':
@@ -153,9 +143,7 @@ class JournalParse:
                                                              entry['BodyID'], self._session)
                 target = int(entry['EfficiencyTarget'])
                 used = int(entry['ProbesUsed'])
-                status = planet.get_status(self._cmdr.id)
-                status.mapped = True
-                status.efficient = target >= used
+                planet.set_mapped(True, self._cmdr.id).set_efficient(target >= used, self._cmdr.id)
                 self._session.commit()
             case 'scanorganic':
                 self.add_scan(entry)
@@ -163,8 +151,8 @@ class JournalParse:
                 if entry['Category'] == '$Codex_Category_Biology;' and 'BodyID' in entry:
                     self._system = self._session.merge(self._system)
                     self._cmdr = self._session.merge(self._cmdr)
-                    planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
-                                                  .where(Planet.body_id == entry['BodyID']))
+                    planet: Planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
+                                                          .where(Planet.body_id == entry['BodyID']))
                     if not planet:
                         return
 
@@ -217,6 +205,16 @@ class JournalParse:
             self._system.region = region[0]
         self._session.commit()
 
+    def get_system_status(self) -> SystemStatus:
+        statuses: list[SystemStatus] = self._system.statuses
+        statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
+        if len(statuses):
+            status = statuses[0]
+        else:
+            status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
+            self._session.add(status)
+        return status
+
     def add_star(self, entry: Mapping[str, Any]) -> None:
         """
         Add main star data from journal event
@@ -229,7 +227,7 @@ class JournalParse:
 
         star_data.set_distance(entry['DistanceFromArrivalLS']).set_type(entry['StarType']) \
             .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity']) \
-            .set_discovered(True).set_was_discovered(entry['WasDiscovered'])
+            .set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id)
 
     def add_planet(self, entry: Mapping[str, Any]) -> None:
         body_short_name = self.get_body_name(entry['BodyName'])
