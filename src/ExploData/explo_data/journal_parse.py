@@ -60,7 +60,7 @@ class JournalParse:
 
     def parse_journal(self, journal: Path, event: Event) -> bool:
         if event.is_set():
-            return False
+            return True
         found = self._session.scalar(select(JournalLog).where(JournalLog.journal == journal.name))
         if not found:
             log: BinaryIO = open(journal, 'rb', 0)
