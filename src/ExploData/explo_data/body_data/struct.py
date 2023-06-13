@@ -50,7 +50,7 @@ class PlanetData:
             status = statuses[0]
         else:
             status = PlanetStatus(planet_id=self._data.id, commander_id=commander_id)
-            self._session.add(status)
+            self._data.statuses.append(status)
         return status
 
     def get_atmosphere(self) -> str:
