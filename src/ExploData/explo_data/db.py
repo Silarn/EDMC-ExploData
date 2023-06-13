@@ -83,6 +83,8 @@ class System(Base):
 
 
 class SystemStatus(Base):
+    __tablename__ = 'system_status'
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     system_id: Mapped[int] = mapped_column(ForeignKey('systems.id'))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
@@ -90,6 +92,8 @@ class SystemStatus(Base):
     honked: Mapped[bool] = mapped_column(default=False)
     fully_scanned: Mapped[bool] = mapped_column(default=False)
     fully_mapped: Mapped[bool] = mapped_column(default=False)
+    __table_args__ = (UniqueConstraint('system_id', 'commander_id', name='_system_commander_constraint'),
+                      )
 
 
 class Planet(Base):
@@ -121,9 +125,13 @@ class Planet(Base):
     )
     materials: Mapped[str] = mapped_column(default='')
     terraform_state: Mapped[str] = mapped_column(default='')
+    __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
+                      )
 
 
 class PlanetStatus(Base):
+    __tablename__ = 'planet_status'
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id'))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
@@ -133,6 +141,8 @@ class PlanetStatus(Base):
     mapped: Mapped[bool] = mapped_column(default=False)
     was_mapped: Mapped[bool] = mapped_column(default=False)
     efficient: Mapped[bool] = mapped_column(default=False)
+    __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
+                      )
 
 
 class PlanetGas(Base):
@@ -201,19 +211,25 @@ class Star(Base):
         back_populates='status', cascade='all, delete-orphan'
     )
     distance: Mapped[Optional[float]]
-    mass: Mapped[Optional[float]]
+    mass: Mapped[float] = mapped_column(default=0.0)
     type: Mapped[str] = mapped_column(default='')
     subclass: Mapped[int] = mapped_column(default=0)
     luminosity: Mapped[str] = mapped_column(default='')
+    __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
+                      )
 
 
 class StarStatus(Base):
+    __tablename__ = 'star_status'
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     star_id: Mapped[int] = mapped_column(ForeignKey('stars.id'))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
     status: Mapped['Star'] = relationship(back_populates='statuses')
     discovered: Mapped[bool] = mapped_column(default=True)
     was_discovered: Mapped[bool] = mapped_column(default=False)
+    __table_args__ = (UniqueConstraint('star_id', 'commander_id', name='_star_commander_constraint'),
+                      )
 
 
 class CodexScans(Base):
