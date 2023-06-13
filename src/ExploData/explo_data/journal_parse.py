@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# ExploData module plugin for EDMC
+# Source: https://github.com/Silarn/EDMC-ExploData
+# Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
+
 import concurrent
 import json
 import re
@@ -33,7 +38,7 @@ JOURNAL2_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.([0-9]{4})-([0-9]{2})-([0-9
 
 
 class This:
-    """Holds module globals."""
+    """Holds globals."""
 
     def __init__(self):
         self.migration_failed: bool = False
@@ -53,12 +58,23 @@ logger = get_plugin_logger('this.NAME')
 
 
 class JournalParse:
+    """
+    This class is a general purpose container to process individual journal files. It's used both by the main
+    EDMC journal parser hook and by the threaded journal import function, generally called by other plugins.
+    """
     def __init__(self, session: Session):
         self._session: Session = session
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
 
     def parse_journal(self, journal: Path, event: Event) -> bool:
+        """
+        Function used to kick on a full journal import.
+
+        :param journal: The journal file to parse
+        :param event: The threaded Event used to interrupt the process
+        :return: Success or failure of the journal import
+        """
         if event.is_set():
             return True
         found = self._session.scalar(select(JournalLog).where(JournalLog.journal == journal.name))
@@ -87,6 +103,12 @@ class JournalParse:
         return True
 
     def parse_entry(self, line: bytes) -> bool:
+        """
+        Parse a single line of a journal file. Load as JSON and pass to the processor.
+
+        :param line: The line of the journal file
+        :returns: False if an Exception occurs, otherwise true
+        """
         if line is None:
             return False
 
@@ -99,6 +121,11 @@ class JournalParse:
         return True
 
     def process_entry(self, entry: Mapping[str, Any]) -> None:
+        """
+        Main journal entry processor. Parses important events and submits the appropriate data objects to the database.
+
+        :param entry: JSON object of the current journal line
+        """
         event_type = entry['event'].lower()
         match event_type:
             case 'loadgame':
@@ -210,6 +237,9 @@ class JournalParse:
         return body_name
 
     def set_cmdr(self, name: str) -> None:
+        """
+        Submit or create a Commander entry and save it to the local journal processor
+        """
         self._session.commit()
         self._session.close()
 
@@ -221,6 +251,9 @@ class JournalParse:
             self._session.commit()
 
     def set_system(self, name: str, address: list[float]) -> None:
+        """
+        Submit or create a System entry and save it to the local journal processor
+        """
         if not address:
             return
         self._system = self._session.scalar(select(System).where(System.name == name))
@@ -236,6 +269,9 @@ class JournalParse:
         self._session.commit()
 
     def get_system_status(self) -> SystemStatus:
+        """
+        Fetch or create the SystemStatus data attached to the local System object
+        """
         statuses: list[SystemStatus] = self._system.statuses
         statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
         if len(statuses):
@@ -247,7 +283,7 @@ class JournalParse:
 
     def add_star(self, entry: Mapping[str, Any]) -> None:
         """
-        Add main star data from journal event
+        Add star data from journal event
 
         :param entry: The journal event dict (must be a Scan event with star data)
         """
@@ -261,6 +297,12 @@ class JournalParse:
             star_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id)
 
     def add_planet(self, entry: Mapping[str, Any]) -> None:
+        """
+        Add planet data from journal event
+
+        :param entry: The journal event dict (must be a Scan event with planet data)
+        """
+
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
@@ -291,6 +333,12 @@ class JournalParse:
                 body_data.add_gas(gas['Name'], gas['Percent'])
 
     def add_signals(self, entry: Mapping[str, Any]) -> None:
+        """
+        Add signal data to a planet. This currently only tracks biological signals.
+
+        :param entry: The journal event dict. Must be an event with Signal data.
+        """
+
         body_short_name = self.get_body_name(entry['BodyName'])
 
         if body_short_name.endswith('Ring') or body_short_name.find('Belt Cluster') != -1:
@@ -310,6 +358,11 @@ class JournalParse:
                     body_data.add_flora(genus['Genus'])
 
     def add_scan(self, entry: Mapping[str, Any]) -> None:
+        """
+        Add scan data to a planet flora. Parse the type and color, if possible.
+
+        :param entry: The journal event dict. Must be a ScanOrganic event.
+        """
         planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
                                       .where(Planet.body_id == entry['Body']))
         if not planet:
@@ -337,6 +390,12 @@ class JournalParse:
 
 
 def parse_journal(journal: Path, event: Event) -> bool:
+    """
+    Kickoff function for importing a journal file. Builds a new JournalParse object and begins parsing.
+
+    :param journal: Path object pointing to the journal file
+    :param event: Threaded event used to cancel the journal parsing process
+    """
     return JournalParse(get_session()).parse_journal(journal, event)
 
 
@@ -430,6 +489,15 @@ def journal_worker() -> None:
 
 def register_journal_callbacks(frame: tk.Frame, event_name: str, start_func: Optional[Callable],
                                update_func: Optional[Callable], stop_func: Optional[Callable]) -> None:
+    """
+    Callback registration for journal import events. Can optionally pass a start, update, and stop callback.
+
+    :param frame: The TKinter Frame to attach the event to.
+    :param event_name: Unique event identifier for the callback functions
+    :param start_func: Optional callback function for start events
+    :param update_func: Optional callback function for update events
+    :param stop_func: Optional callback function for stop events
+    """
     this.journal_processing_callbacks[event_name] = frame
     if start_func:
         frame.bind(f'<<{event_name}_journal_start>>', start_func)
@@ -440,21 +508,38 @@ def register_journal_callbacks(frame: tk.Frame, event_name: str, start_func: Opt
 
 
 def fire_start_event() -> None:
+    """
+    Trigger function for journal import start events. Fires the registered event handlers.
+    """
     for name, frame in this.journal_processing_callbacks.items():
         frame.event_generate(f'<<{name}_journal_start>>')
 
 
 def fire_progress_event() -> None:
+    """
+    Trigger function for journal import progress events. Fires the registered event handlers.
+    """
     for name, frame in this.journal_processing_callbacks.items():
         frame.event_generate(f'<<{name}_journal_progress>>')
 
 
 def fire_finish_event() -> None:
+    """
+    Trigger function for journal import stop events. Fires the registered event handlers.
+    """
     for name, frame in this.journal_processing_callbacks.items():
         frame.event_generate(f'<<{name}_journal_finish>>')
 
 
 def register_event_callbacks(events: set[str], func: Callable) -> None:
+    """
+    Callback registration for main-thread journal processing. Pass a set of events and a function to run when the event
+    is found. Passes the journal entry to the event handler callback.
+
+    :param events: A set of event names to be handled by the callback
+    :param func: The callback function to attach to the specified events
+    """
+
     for event in events:
         callbacks = this.event_callbacks.get(event, set())
         callbacks.add(func)
@@ -462,6 +547,13 @@ def register_event_callbacks(events: set[str], func: Callable) -> None:
 
 
 def fire_event_callbacks(entry: Mapping[str, Any]):
+    """
+    Event trigger for registered callbacks. Passes the current journal entry data to any function registered to handle
+    that event.
+
+    :param entry: The journal entry data to pass to the callback
+    """
+
     if entry['event'] in this.event_callbacks:
         for func in this.event_callbacks[entry['event']]:
             try:
@@ -471,6 +563,10 @@ def fire_event_callbacks(entry: Mapping[str, Any]):
 
 
 def shutdown() -> None:
+    """
+    Journal import shutdown handler. Trigger graceful exit of any active import threads.
+    """
+
     if this.journal_thread and this.journal_thread.is_alive():
         this.journal_stop = True
         if this.journal_event:
@@ -478,8 +574,16 @@ def shutdown() -> None:
 
 
 def has_error() -> bool:
+    """
+    Helper function to access local data about the journal import error status.
+    """
+
     return this.journal_error
 
 
 def get_progress() -> float:
+    """
+    Helper function to access local data about the journal import progress.
+    """
+
     return this.journal_progress

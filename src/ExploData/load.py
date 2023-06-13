@@ -28,6 +28,14 @@ logger = get_plugin_logger(this.NAME)
 
 
 def plugin_start3(plugin_dir: str) -> str:
+    """
+    EDMC start hook.
+    Initializes SQLite database.
+
+    :param plugin_dir: The plugin's directory
+    :return: The plugin's canonical name
+    """
+
     db.init()
     this.journal_processor = JournalParse(db.get_session())
     return 'ExploData'
@@ -56,6 +64,19 @@ def plugin_stop():
 def journal_entry(
         cmdr: str, is_beta: bool, system: str, station: str, entry: Mapping[str, any], state: MutableMapping[str, any]
 ) -> str:
+    """
+    EDMC journal entry hook. Primary journal data handler.
+    Pass the journal events to the main journal processor, then pass the events to any registered callbacks.
+
+    :param cmdr: The commander name
+    :param is_beta: Beta status (unused)
+    :param system: The system name
+    :param station: The current station name (unused)
+    :param entry: The journal entry dictionary object
+    :param state: The EDMC state dictionary object
+    :return: Result string. Empty means success.
+    """
+
     if not state['StarPos'] or not system or not cmdr:
         return ''
 

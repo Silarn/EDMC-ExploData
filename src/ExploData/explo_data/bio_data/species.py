@@ -1,5 +1,5 @@
 data: dict[str, set[str]] = {
-    '$Codex_Ent_Cone_Name;': {  # No atmos, near center of nebula
+    '$Codex_Ent_Cone_Name;': {
         '$Codex_Ent_Cone_Name;'
     },
     '$Codex_Ent_Ground_Struct_Ice_Name;': {

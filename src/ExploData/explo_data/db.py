@@ -1,6 +1,7 @@
-"""
-The database structure models and helper functions for ExploData data
-"""
+# -*- coding: utf-8 -*-
+# ExploData module plugin for EDMC
+# Source: https://github.com/Silarn/EDMC-ExploData
+# Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
 
 import threading
 from sqlite3 import OperationalError
@@ -22,7 +23,7 @@ logger = get_plugin_logger(plugin_name)
 
 
 class This:
-    """Holds module globals."""
+    """Holds globals."""
 
     def __init__(self):
         self.sql_engine: Optional[Engine] = None
@@ -37,6 +38,11 @@ class This:
 
 
 this = This()
+
+
+"""
+Define the SQLAlchemy Schemas
+"""
 
 
 class Base(DeclarativeBase):
@@ -259,6 +265,11 @@ class CodexScans(Base):
     __table_args__ = (UniqueConstraint('commander_id', 'region', 'biological', name='_cmdr_bio_region_constraint'),)
 
 
+"""
+Database migration functions
+"""
+
+
 def modify_table(engine: Engine, table: type[Base], required_tables: Optional[list[type[Base]]] = None):
     new_table_name = f'{table.__tablename__}_new'
     statement = text(f'DROP TABLE IF EXISTS {new_table_name}')  # drop table left over from failed migration
@@ -385,8 +396,17 @@ WHERE ROWID IN
     return True
 
 
+"""
+Database initialization
+"""
+
+
 @event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def set_sqlite_pragma(dbapi_connection, connection_record) -> None:
+    """
+    Event listener to set foreign keys on for the sqlite database any time the Engine opens a connection
+    """
+
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
@@ -416,6 +436,10 @@ def init() -> bool:
 
 
 def shutdown() -> None:
+    """
+    Close open sessions and dispose of the SQL engine
+    """
+
     try:
         this.sql_session_factory.close()
         this.sql_engine.dispose()
@@ -424,8 +448,20 @@ def shutdown() -> None:
 
 
 def get_session() -> Session:
+    """
+    Get a thread-safe Session for the active DB Engine
+
+    :return: Return a new thread-safe Session object
+    """
+
     return this.sql_session_factory()
 
 
 def get_engine() -> Engine:
+    """
+    Get the active SQLAlchemy Engine
+
+    :return: Return the Engine object
+    """
+
     return this.sql_engine

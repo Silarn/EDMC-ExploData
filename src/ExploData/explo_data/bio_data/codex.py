@@ -1,11 +1,14 @@
-import re
+# -*- coding: utf-8 -*-
+# ExploData module plugin for EDMC
+# Source: https://github.com/Silarn/EDMC-ExploData
+# Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
 
 from sqlalchemy import select
 
-from explo_data import db
-from explo_data.bio_data.genus import data as bio_genus
-from explo_data.bio_data.species import data as bio_types
-from explo_data.db import CodexScans
+from ...explo_data import db
+from ...explo_data.bio_data.genus import data as bio_genus
+from ...explo_data.bio_data.species import data as bio_types
+from ...explo_data.db import CodexScans
 
 bio_codex_map = {
     '$Codex_Ent_Aleoids_Genus_Name;': {
@@ -201,6 +204,13 @@ bio_color_suffix_map = {
 
 
 def parse_variant(name: str) -> tuple[str, str, str]:
+    """
+    Get the appropriate genus, species, and variant strings from the final species/variant identifier
+
+    :param name: The complete species/variant identifier
+    :return: Tuple of the genus, species, and variant strings
+    """
+
     for genus, search_set in bio_codex_map.items():
         for search in search_set:
             if name.startswith(search):
@@ -229,6 +239,14 @@ def parse_variant(name: str) -> tuple[str, str, str]:
 
 
 def set_codex(commander: int, biological: str, region: int) -> None:
+    """
+    Helper function to set codex data in the database
+
+    :param commander: The active Commander's database ID
+    :param biological: The full codex ID from a CodexEntry event
+    :param region: The calculated region ID of the current system
+    """
+
     if region is None:
         return
 
