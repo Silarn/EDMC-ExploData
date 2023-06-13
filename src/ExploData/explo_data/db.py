@@ -8,7 +8,7 @@ from typing import Optional
 
 import sqlalchemy.exc
 from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Table, \
-    MetaData, Executable, Result, create_engine, ColumnDefault
+    MetaData, Executable, Result, create_engine, ColumnDefault, event
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql.ddl import CreateTable
@@ -43,18 +43,24 @@ class Base(DeclarativeBase):
     pass
 
 
-class Commander(Base):
-    __tablename__ = 'commanders'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(22), unique=True)
-
-
 class Metadata(Base):
     __tablename__ = 'metadata'
 
     key: Mapped[str] = mapped_column(primary_key=True)
     value: Mapped[str] = mapped_column(default='')
+
+
+class JournalLog(Base):
+    __tablename__ = 'journal_log'
+
+    journal: Mapped[str] = mapped_column(String(32), primary_key=True)
+
+
+class Commander(Base):
+    __tablename__ = 'commanders'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(22), unique=True)
 
 
 class System(Base):
@@ -63,9 +69,6 @@ class System(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
-    statuses: Mapped[list['SystemStatus']] = relationship(
-        back_populates='status', cascade='all, delete-orphan'
-    )
     x: Mapped[float] = mapped_column(default=0.0)
     y: Mapped[float] = mapped_column(default=0.0)
     z: Mapped[float] = mapped_column(default=0.0)
@@ -73,22 +76,18 @@ class System(Base):
     body_count: Mapped[int] = mapped_column(default=1)
     non_body_count: Mapped[int] = mapped_column(default=0)
 
-    planets: Mapped[list['Planet']] = relationship(
-        back_populates='planet', cascade='all, delete-orphan'
-    )
-
-    stars: Mapped[list['Star']] = relationship(
-        back_populates='star', cascade='all, delete-orphan'
-    )
+    statuses: Mapped[list['SystemStatus']] = relationship(backref='status', passive_deletes=True)
+    planets: Mapped[list['Planet']] = relationship(backref='planet', passive_deletes=True)
+    stars: Mapped[list['Star']] = relationship(backref='star', passive_deletes=True)
+    non_bodies: Mapped[list['NonBody']] = relationship(backref='non_body', passive_deletes=True)
 
 
 class SystemStatus(Base):
     __tablename__ = 'system_status'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id'))
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
-    status: Mapped['System'] = relationship(back_populates='statuses')
+    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id', ondelete="CASCADE"))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     honked: Mapped[bool] = mapped_column(default=False)
     fully_scanned: Mapped[bool] = mapped_column(default=False)
     fully_mapped: Mapped[bool] = mapped_column(default=False)
@@ -96,120 +95,15 @@ class SystemStatus(Base):
                       )
 
 
-class Planet(Base):
-    """ DB model for planet data """
-    __tablename__ = 'planets'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id'))
-    planet: Mapped[list['System']] = relationship(back_populates='planets')
-    name: Mapped[str] = mapped_column(String(32))
-    type: Mapped[str] = mapped_column(String(32), default='')
-    body_id: Mapped[int]
-    statuses: Mapped[list['PlanetStatus']] = relationship(
-        back_populates='status', cascade='all, delete-orphan'
-    )
-    atmosphere: Mapped[str] = mapped_column(String(32), default='')
-    gasses: Mapped[list['PlanetGas']] = relationship(
-        back_populates='gas', cascade='all, delete-orphan'
-    )
-    volcanism: Mapped[Optional[str]] = mapped_column(String(32))
-    distance: Mapped[float] = mapped_column(default=0.0)
-    mass: Mapped[float] = mapped_column(default=0.0)
-    gravity: Mapped[float] = mapped_column(default=0.0)
-    temp: Mapped[Optional[float]]
-    parent_stars: Mapped[str] = mapped_column(default='')
-    bio_signals: Mapped[int] = mapped_column(default=0)
-    floras: Mapped[list['PlanetFlora']] = relationship(
-        back_populates='flora', cascade='all, delete-orphan'
-    )
-    materials: Mapped[str] = mapped_column(default='')
-    terraform_state: Mapped[str] = mapped_column(default='')
-    __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
-                      )
-
-
-class PlanetStatus(Base):
-    __tablename__ = 'planet_status'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id'))
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
-    status: Mapped['Planet'] = relationship(back_populates='statuses')
-    discovered: Mapped[bool] = mapped_column(default=True)
-    was_discovered: Mapped[bool] = mapped_column(default=False)
-    mapped: Mapped[bool] = mapped_column(default=False)
-    was_mapped: Mapped[bool] = mapped_column(default=False)
-    efficient: Mapped[bool] = mapped_column(default=False)
-    __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
-                      )
-
-
-class PlanetGas(Base):
-    __tablename__ = 'planet_gasses'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id'))
-    gas: Mapped['Planet'] = relationship(back_populates='gasses')
-    gas_name: Mapped[str]
-    percent: Mapped[float]
-    __table_args__ = (UniqueConstraint('planet_id', 'gas_name', name='_planet_gas_constraint'), )
-
-    def __repr__(self) -> str:
-        return f'PlanetGas(gas_name={self.gas_name!r}, percent={self.percent!r})'
-
-
-class PlanetFlora(Base):
-    __tablename__ = 'planet_flora'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id'))
-    flora: Mapped['Planet'] = relationship(back_populates='floras')
-    scans: Mapped[list['FloraScans']] = relationship(back_populates='scan', cascade='all, delete-orphan')
-    waypoints: Mapped[list['Waypoint']] = relationship(back_populates='waypoint', cascade='all, delete-orphan')
-    genus: Mapped[str]
-    species: Mapped[str] = mapped_column(default='')
-    color: Mapped[str] = mapped_column(default='')
-    __table_args__ = (UniqueConstraint('planet_id', 'genus', name='_planet_genus_constraint'),
-                      )
-
-
-class FloraScans(Base):
-    __tablename__ = 'flora_scans'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
-    flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id'))
-    scan: Mapped['PlanetFlora'] = relationship(back_populates='scans')
-    count: Mapped[int] = mapped_column(default=0)
-    __table_args__ = (UniqueConstraint('commander_id', 'flora_id', name='_cmdr_flora_constraint'),
-                      )
-
-
-class Waypoint(Base):
-    __tablename__ = 'flora_waypoints'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
-    flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id'))
-    waypoint: Mapped['PlanetFlora'] = relationship(back_populates='waypoints')
-    type: Mapped[str] = mapped_column(default='tag')
-    latitude: Mapped[float]
-    longitude: Mapped[float]
-
-
 class Star(Base):
     """ DB model for star data """
     __tablename__ = 'stars'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id'))
-    star: Mapped[list['System']] = relationship(back_populates='stars')
+    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id', ondelete="CASCADE"))
     name: Mapped[str]
     body_id: Mapped[int]
-    statuses: Mapped[list['StarStatus']] = relationship(
-        back_populates='status', cascade='all, delete-orphan'
-    )
+    statuses: Mapped[list['StarStatus']] = relationship(backref='status', passive_deletes=True)
     distance: Mapped[Optional[float]]
     mass: Mapped[float] = mapped_column(default=0.0)
     type: Mapped[str] = mapped_column(default='')
@@ -223,12 +117,131 @@ class StarStatus(Base):
     __tablename__ = 'star_status'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    star_id: Mapped[int] = mapped_column(ForeignKey('stars.id'))
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
-    status: Mapped['Star'] = relationship(back_populates='statuses')
+    star_id: Mapped[int] = mapped_column(ForeignKey('stars.id', ondelete="CASCADE"))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     discovered: Mapped[bool] = mapped_column(default=True)
     was_discovered: Mapped[bool] = mapped_column(default=False)
     __table_args__ = (UniqueConstraint('star_id', 'commander_id', name='_star_commander_constraint'),
+                      )
+
+
+class Planet(Base):
+    """ DB model for planet data """
+    __tablename__ = 'planets'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id', ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(32))
+    type: Mapped[str] = mapped_column(String(32), default='')
+    body_id: Mapped[int]
+    atmosphere: Mapped[str] = mapped_column(String(32), default='')
+    volcanism: Mapped[Optional[str]] = mapped_column(String(32))
+    distance: Mapped[float] = mapped_column(default=0.0)
+    mass: Mapped[float] = mapped_column(default=0.0)
+    gravity: Mapped[float] = mapped_column(default=0.0)
+    temp: Mapped[Optional[float]]
+    parent_stars: Mapped[str] = mapped_column(default='')
+    bio_signals: Mapped[int] = mapped_column(default=0)
+    materials: Mapped[str] = mapped_column(default='')
+    terraform_state: Mapped[str] = mapped_column(default='')
+
+    statuses: Mapped[list['PlanetStatus']] = relationship(backref='status', passive_deletes=True)
+    gasses: Mapped[list['PlanetGas']] = relationship(backref='gas', passive_deletes=True)
+    floras: Mapped[list['PlanetFlora']] = relationship(backref='flora', passive_deletes=True)
+
+    __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
+                      )
+
+
+class PlanetStatus(Base):
+    __tablename__ = 'planet_status'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    discovered: Mapped[bool] = mapped_column(default=True)
+    was_discovered: Mapped[bool] = mapped_column(default=False)
+    mapped: Mapped[bool] = mapped_column(default=False)
+    was_mapped: Mapped[bool] = mapped_column(default=False)
+    efficient: Mapped[bool] = mapped_column(default=False)
+    __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
+                      )
+
+
+class PlanetGas(Base):
+    __tablename__ = 'planet_gasses'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
+    gas_name: Mapped[str]
+    percent: Mapped[float]
+    __table_args__ = (UniqueConstraint('planet_id', 'gas_name', name='_planet_gas_constraint'), )
+
+    def __repr__(self) -> str:
+        return f'PlanetGas(gas_name={self.gas_name!r}, percent={self.percent!r})'
+
+
+class PlanetFlora(Base):
+    __tablename__ = 'planet_flora'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
+    genus: Mapped[str]
+    species: Mapped[str] = mapped_column(default='')
+    color: Mapped[str] = mapped_column(default='')
+
+    scans: Mapped[list['FloraScans']] = relationship(backref='scan', passive_deletes=True)
+    waypoints: Mapped[list['Waypoint']] = relationship(backref='waypoint', passive_deletes=True)
+
+    __table_args__ = (UniqueConstraint('planet_id', 'genus', name='_planet_genus_constraint'),
+                      )
+
+
+class FloraScans(Base):
+    __tablename__ = 'flora_scans'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
+    count: Mapped[int] = mapped_column(default=0)
+    __table_args__ = (UniqueConstraint('commander_id', 'flora_id', name='_cmdr_flora_constraint'),
+                      )
+
+
+class Waypoint(Base):
+    __tablename__ = 'flora_waypoints'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
+    type: Mapped[str] = mapped_column(default='tag')
+    latitude: Mapped[float]
+    longitude: Mapped[float]
+
+
+class NonBody(Base):
+    __tablename__ = 'non_bodies'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    system_id: Mapped[int] = mapped_column(ForeignKey('systems.id', ondelete="CASCADE"))
+    name: Mapped[str]
+    body_id: Mapped[int]
+
+    statuses: Mapped[list['NonBodyStatus']] = relationship(backref='status', passive_deletes=True)
+
+    __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
+                      )
+
+
+class NonBodyStatus(Base):
+    __tablename__ = 'non_body_status'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    non_body_id: Mapped[int] = mapped_column(ForeignKey('non_bodies.id', ondelete="CASCADE"))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    discovered: Mapped[bool] = mapped_column(default=True)
+    was_discovered: Mapped[bool] = mapped_column(default=False)
+    __table_args__ = (UniqueConstraint('non_body_id', 'commander_id', name='_nonbody_commander_constraint'),
                       )
 
 
@@ -236,37 +249,27 @@ class CodexScans(Base):
     __tablename__ = 'codex_scans'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id'))
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     region: Mapped[int]
     biological: Mapped[str] = mapped_column(default='')
     __table_args__ = (UniqueConstraint('commander_id', 'region', 'biological', name='_cmdr_bio_region_constraint'),)
 
 
-class JournalLog(Base):
-    __tablename__ = 'journal_log'
-
-    journal: Mapped[str] = mapped_column(String(32), primary_key=True)
-
-
-def modify_table(engine: Engine, table: type[Base]):
+def modify_table(engine: Engine, table: type[Base], required_tables: Optional[list[type[Base]]] = None):
     new_table_name = f'{table.__tablename__}_new'
     statement = text(f'DROP TABLE IF EXISTS {new_table_name}')  # drop table left over from failed migration
     run_statement(engine, statement)
     run_query(engine, 'PRAGMA foreign_keys=off')
     metadata = MetaData()
-    columns: list[Column] = [column.copy() for column in table.__table__.columns.values()]
+    if required_tables:
+        for parent_table in required_tables:
+            parent_table.__table__.to_metadata(metadata)
+    new_table = table.__table__.to_metadata(metadata, name=new_table_name)
     column_names: list[str] = table.__table__.columns.keys()
-    args = []
-    if hasattr(table, '__table_args__'):
-        for arg in table.__table_args__:
-            if type(arg) == UniqueConstraint:
-                args.append(arg.copy())
-            else:
-                args.append(arg)
-    new_table = Table(new_table_name, metadata, *columns, *args)
     statement = text(str(CreateTable(new_table).compile(engine)))
     run_statement(engine, statement)
-    statement = text(f'INSERT INTO `{new_table_name}` ({", ".join(column_names)}) SELECT {", ".join(column_names)} FROM `{table.__tablename__}`')
+    statement = text(f'INSERT INTO `{new_table_name}` ({", ".join(column_names)}) SELECT {", ".join(column_names)} '
+                     f'FROM `{table.__tablename__}`')
     run_statement(engine, statement)
     statement = text(f'DROP TABLE `{table.__tablename__}`')
     run_statement(engine, statement)
@@ -304,6 +307,25 @@ def run_statement(engine: Engine, statement: Executable) -> Result:
     connection.commit()
     connection.close()
     return result
+
+
+def affix_schemas(engine: Engine) -> None:
+    modify_table(engine, Metadata)
+    modify_table(engine, JournalLog)
+    modify_table(engine, Commander)
+    modify_table(engine, System)
+    modify_table(engine, SystemStatus, [System, Commander])
+    modify_table(engine, Star, [System])
+    modify_table(engine, StarStatus, [Star, Commander])
+    modify_table(engine, Planet, [System])
+    modify_table(engine, PlanetStatus, [Planet, Commander])
+    modify_table(engine, PlanetGas, [Planet])
+    modify_table(engine, PlanetFlora, [Planet])
+    modify_table(engine, FloraScans, [PlanetFlora, Commander])
+    modify_table(engine, Waypoint, [PlanetFlora, Commander])
+    modify_table(engine, CodexScans, [Commander])
+    modify_table(engine, NonBody, [System])
+    modify_table(engine, NonBodyStatus, [NonBody, Commander])
 
 
 def migrate(engine: Engine) -> bool:
@@ -344,9 +366,7 @@ WHERE ROWID IN
                 add_column(engine, 'stars', Column('mass', Float(), nullable=False, default=0.0))
                 add_column(engine, 'planets', Column('mass', Float(), nullable=False, default=0.0))
                 add_column(engine, 'planets', Column('terraform_state', String(), nullable=False, default=''))
-                modify_table(engine, System)
-                modify_table(engine, Star)
-                modify_table(engine, Planet)
+                affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
                       .on_conflict_do_update(index_elements=['key'], set_=dict(value=1)))
@@ -359,6 +379,13 @@ WHERE ROWID IN
     run_statement(engine, insert(Metadata).values(key='version', value=database_version)
                   .on_conflict_do_update(index_elements=['key'], set_=dict(value=database_version)))
     return True
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def init() -> bool:

@@ -22,7 +22,7 @@ from config import config
 from .RegionMap import findRegion
 from .bio_data.codex import parse_variant, set_codex
 from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus
-from .body_data.struct import PlanetData, StarData
+from .body_data.struct import PlanetData, StarData, NonBodyData
 
 JOURNAL_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.[0-9]{2,4}-?[0-9]{2}-?[0-9]{2}T?[0-9]{2}[0-9]{2}[0-9]{2}'
                            r'\.[0-9]{2}\.log$')
@@ -117,8 +117,15 @@ class JournalParse:
                 self._cmdr = self._session.merge(self._cmdr) if self._cmdr else None
                 if 'StarType' in entry:
                     self.add_star(entry)
-                elif 'PlanetClass' in entry:
+                elif 'PlanetClass' in entry and entry['PlanetClass']:
                     self.add_planet(entry)
+                else:
+                    non_body = NonBodyData.from_journal(self._system, self.get_body_name(entry['BodyName']),
+                                                        entry['BodyID'], self._session)
+                    if self._cmdr:
+                        non_body.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'],
+                                                                                        self._cmdr.id)
+
             case 'fssdiscoveryscan':
                 if not self._system or not self._cmdr:
                     return
@@ -132,7 +139,7 @@ class JournalParse:
                     status.fully_scanned = True
                 self._session.commit()
             case 'fssbodysignals' | 'saasignalsfound':
-                if not self._system:
+                if self._system is None:
                     return
                 self._system = self._session.merge(self._system)
                 self.add_signals(entry)
@@ -442,7 +449,7 @@ def fire_finish_event() -> None:
 
 def register_event_callbacks(events: set[str], func: Callable) -> None:
     for event in events:
-        callbacks = this.event_callbacks.get('event', set())
+        callbacks = this.event_callbacks.get(event, set())
         callbacks.add(func)
         this.event_callbacks[event] = callbacks
 

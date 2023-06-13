@@ -3,7 +3,7 @@ from typing import Self, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 from ...explo_data.db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star, PlanetStatus, \
-    StarStatus
+    StarStatus, NonBody, NonBodyStatus
 
 
 class PlanetData:
@@ -304,6 +304,76 @@ class PlanetData:
         self.commit()
 
 
+class NonBodyData:
+    """ Holds all attributes, getters, and setters for star data. """
+
+    def __init__(self, system: System, data: NonBody, session: Session):
+        self._session: Session = session
+        self._system: System = system
+        self._data: NonBody = data
+
+    @classmethod
+    def from_journal(cls, system: System, name: str, body_id: int, session: Session):
+        data: NonBody = session.scalar(
+            select(NonBody).where(NonBody.name == name).where(NonBody.system_id == system.id)
+        )
+        if not data:
+            data = NonBody()
+            data.name = name
+            data.system_id = system.id
+            data.body_id = body_id
+            session.add(data)
+        session.commit()
+
+        return cls(system, data, session)
+
+    def get_name(self) -> str:
+        return self._data.name
+
+    def get_id(self) -> int:
+        return self._data.body_id
+
+    def get_status(self, commander_id: int) -> NonBodyStatus:
+        statuses: list[NonBodyStatus] = self._data.statuses
+        statuses = list(filter(lambda item: item.commander_id == commander_id, statuses))
+        if len(statuses):
+            status = statuses[0]
+        else:
+            status = NonBodyStatus(non_body_id=self._data.id, commander_id=commander_id)
+            self._data.statuses.append(status)
+        return status
+
+    def is_discovered(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.discovered
+
+    def set_discovered(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.discovered = value
+        self.commit()
+        return self
+
+    def was_discovered(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.was_discovered
+
+    def set_was_discovered(self, value: bool, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.was_discovered = value
+        self.commit()
+        return self
+
+    def refresh(self) -> None:
+        self._session.refresh(self._system)
+        self._session.refresh(self._data)
+
+    def commit(self) -> None:
+        self._session.commit()
+
+    def __del__(self) -> None:
+        self.commit()
+
+
 class StarData:
     """ Holds all attributes, getters, and setters for star data. """
 
@@ -422,6 +492,15 @@ def load_planets(system: System, session: Session) -> dict[str, PlanetData]:
             planet_data[planet.name] = PlanetData(system, planet, session)
     session.commit()
     return planet_data
+
+
+def load_non_bodies(system: System, session: Session) -> dict[str, NonBodyData]:
+    session.refresh(system)
+    non_body_data: dict[str, NonBodyData] = {}
+    if system and system.id:
+        for non_body in system.non_bodies:  # type: NonBody
+            non_body_data[non_body.name] = NonBodyData(system, non_body, session)
+    return non_body_data
 
 
 def load_stars(system: System, session: Session) -> dict[str, StarData]:
