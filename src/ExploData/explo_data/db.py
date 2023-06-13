@@ -361,7 +361,12 @@ WHERE ROWID IN
     return True
 
 
-def init() -> None:
+def init() -> bool:
+    """
+    Initialize the database and run migrations (if needed)
+
+    :return: True if a migration error occurred
+    """
     if not this.sql_engine:
         # Migrate from older BioScan DB
         old_path = config.app_dir_path / 'bioscan.db'
@@ -376,6 +381,7 @@ def init() -> None:
         if not result:
             this.migration_failed = True
         this.sql_session_factory = scoped_session(sessionmaker(bind=this.sql_engine))
+    return this.migration_failed
 
 
 def shutdown() -> None:
