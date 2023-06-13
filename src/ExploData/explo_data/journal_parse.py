@@ -25,6 +25,8 @@ from sqlite3 import IntegrityError
 from EDMCLogging import get_plugin_logger
 from config import config
 from .RegionMap import findRegion
+
+import const
 from .bio_data.codex import parse_variant, set_codex
 from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus
 from .body_data.struct import PlanetData, StarData, NonBodyData
@@ -54,7 +56,7 @@ class This:
 
 
 this = This()
-logger = get_plugin_logger('this.NAME')
+logger = get_plugin_logger(const.plugin_name)
 
 
 class JournalParse:
