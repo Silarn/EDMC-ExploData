@@ -157,11 +157,15 @@ class JournalParse:
                 self._system = self._session.merge(self._system)
                 self._cmdr = self._session.merge(self._cmdr)
                 body_short_name = self.get_body_name(entry['BodyName'])
-                planet: PlanetData = PlanetData.from_journal(self._system, body_short_name,
-                                                             entry['BodyID'], self._session)
+                if body_short_name.endswith('Ring') or body_short_name.find('Belt Cluster') != -1:
+                    body: NonBodyData = NonBodyData.from_journal(self._system, body_short_name,
+                                                               entry['BodyID'], self._session)
+                else:
+                    body: PlanetData = PlanetData.from_journal(self._system, body_short_name,
+                                                               entry['BodyID'], self._session)
                 target = int(entry['EfficiencyTarget'])
                 used = int(entry['ProbesUsed'])
-                planet.set_mapped(True, self._cmdr.id)\
+                body.set_mapped(True, self._cmdr.id)\
                     .set_efficient(target >= used, self._cmdr.id)
                 self._session.commit()
             case 'scanorganic':
