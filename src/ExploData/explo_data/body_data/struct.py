@@ -339,7 +339,7 @@ class StarData:
         if len(statuses):
             status = statuses[0]
         else:
-            status = StarStatus(planet_id=self._data.id, commander_id=commander_id)
+            status = StarStatus(star_id=self._data.id, commander_id=commander_id)
             self._session.add(status)
         return status
 
