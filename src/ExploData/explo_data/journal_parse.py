@@ -26,7 +26,7 @@ from EDMCLogging import get_plugin_logger
 from config import config
 from .RegionMap import findRegion
 
-import const
+import ExploData.explo_data.const as const
 from .bio_data.codex import parse_variant, set_codex
 from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus
 from .body_data.struct import PlanetData, StarData, NonBodyData
