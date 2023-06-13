@@ -235,7 +235,7 @@ class JournalParse:
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
             .set_mass(entry['MassEM']).set_gravity(entry['SurfaceGravity']) \
             .set_temp(entry.get('SurfaceTemperature', None)).set_volcanism(entry.get('Volcanism', None)) \
-            .set_terraform_state(entry.get('TerraformState', None)).set_discovered(True, self._cmdr.id) \
+            .set_terraform_state(entry.get('TerraformState', '')).set_discovered(True, self._cmdr.id) \
             .set_was_discovered(entry['WasDiscovered'], self._cmdr.id).set_was_mapped(entry['WasMapped'], self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
