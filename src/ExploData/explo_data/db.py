@@ -13,12 +13,12 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql.ddl import CreateTable
 
-from .const import database_version
+from .const import database_version, plugin_name
 
 from EDMCLogging import get_plugin_logger
 from config import config
 
-logger = get_plugin_logger('BioScan')
+logger = get_plugin_logger(plugin_name)
 
 
 class This:
