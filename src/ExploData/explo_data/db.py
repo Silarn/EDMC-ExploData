@@ -262,12 +262,19 @@ def modify_table(engine: Engine, table: type[Base]):
 def add_column(engine: Engine, table_name: str, column: Column):
     column_name = column.compile(dialect=engine.dialect)
     column_type = column.type.compile(engine.dialect)
+    default: Optional[ColumnDefault] = column.default
+    default_arg: any = default.arg if default.has_arg else None
+    if type(default_arg) is str:
+        default_arg = f"'{default_arg}'"
+    null_text = ' NOT NULL' if not column.nullable else ''
+    default_text = f' DEFAULT {default_arg}' if default_arg is not None else ''
+
     try:
         statement = text(f'ALTER TABLE {table_name} DROP COLUMN {column_name}')
         run_statement(engine, statement)
     except (OperationalError, sqlalchemy.exc.OperationalError):
         pass
-    statement = text(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}')
+    statement = text(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}{null_text}{default_text}')
     run_statement(engine, statement)
 
 
