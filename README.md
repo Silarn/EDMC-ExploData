@@ -12,13 +12,13 @@ functions by itself.
 
 The data currently being collected by this plugin includes:
 
-Commanders (for data segmentation)
-Systems (name, location, body count and scan status)
-Stars (name, location, and various properties, discovery status)
-Planets (name, location, attributes, local biological signals, discovery and mapped status)
-Non Body Objects (rings)
-Flora (type, location, scan status)
-Codex Entries (for biological signals)
+- Commanders (for data segmentation)
+- Systems (name, location, body count and scan status)
+- Stars (name, location, and various properties, discovery status)
+- Planets (name, location, attributes, local biological signals, discovery and mapped status)
+- Non-body Objects (rings, asteroid clusters)
+- Flora (type, location, scan status)
+- Codex Entries (for biological signals)
 
 ### Location
 
