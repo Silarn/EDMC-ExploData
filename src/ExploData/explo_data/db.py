@@ -8,7 +8,7 @@ from typing import Optional
 
 import sqlalchemy.exc
 from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Table, \
-    MetaData, Executable, Result, create_engine, Boolean
+    MetaData, Executable, Result, create_engine, ColumnDefault
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql.ddl import CreateTable
