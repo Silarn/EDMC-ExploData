@@ -159,7 +159,7 @@ class JournalParse:
                 body_short_name = self.get_body_name(entry['BodyName'])
                 if body_short_name.endswith('Ring') or body_short_name.find('Belt Cluster') != -1:
                     body: NonBodyData = NonBodyData.from_journal(self._system, body_short_name,
-                                                               entry['BodyID'], self._session)
+                                                                 entry['BodyID'], self._session)
                 else:
                     body: PlanetData = PlanetData.from_journal(self._system, body_short_name,
                                                                entry['BodyID'], self._session)
