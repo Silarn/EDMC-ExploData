@@ -8,7 +8,7 @@ from sqlite3 import OperationalError
 from typing import Optional
 
 import sqlalchemy.exc
-from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Table, \
+from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, \
     MetaData, Executable, Result, create_engine, ColumnDefault, event
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
@@ -75,12 +75,12 @@ class System(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
-    x: Mapped[float] = mapped_column(default=0.0)
-    y: Mapped[float] = mapped_column(default=0.0)
-    z: Mapped[float] = mapped_column(default=0.0)
+    x: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    y: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    z: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     region: Mapped[Optional[int]]
-    body_count: Mapped[int] = mapped_column(default=1)
-    non_body_count: Mapped[int] = mapped_column(default=0)
+    body_count: Mapped[int] = mapped_column(default=1, server_default=text('1'))
+    non_body_count: Mapped[int] = mapped_column(default=0, server_default=text('0'))
 
     statuses: Mapped[list['SystemStatus']] = relationship(backref='status', passive_deletes=True)
     planets: Mapped[list['Planet']] = relationship(backref='planet', passive_deletes=True)
@@ -94,9 +94,9 @@ class SystemStatus(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     system_id: Mapped[int] = mapped_column(ForeignKey('systems.id', ondelete="CASCADE"))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    honked: Mapped[bool] = mapped_column(default=False)
-    fully_scanned: Mapped[bool] = mapped_column(default=False)
-    fully_mapped: Mapped[bool] = mapped_column(default=False)
+    honked: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    fully_scanned: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    fully_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     __table_args__ = (UniqueConstraint('system_id', 'commander_id', name='_system_commander_constraint'),
                       )
 
@@ -111,10 +111,10 @@ class Star(Base):
     body_id: Mapped[int]
     statuses: Mapped[list['StarStatus']] = relationship(backref='status', passive_deletes=True)
     distance: Mapped[Optional[float]]
-    mass: Mapped[float] = mapped_column(default=0.0)
-    type: Mapped[str] = mapped_column(default='')
-    subclass: Mapped[int] = mapped_column(default=0)
-    luminosity: Mapped[str] = mapped_column(default='')
+    mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    type: Mapped[str] = mapped_column(default='', server_default='')
+    subclass: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    luminosity: Mapped[str] = mapped_column(default='', server_default='')
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
                       )
 
@@ -125,8 +125,8 @@ class StarStatus(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     star_id: Mapped[int] = mapped_column(ForeignKey('stars.id', ondelete="CASCADE"))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    discovered: Mapped[bool] = mapped_column(default=True)
-    was_discovered: Mapped[bool] = mapped_column(default=False)
+    discovered: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
+    was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     __table_args__ = (UniqueConstraint('star_id', 'commander_id', name='_star_commander_constraint'),
                       )
 
@@ -138,18 +138,18 @@ class Planet(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     system_id: Mapped[int] = mapped_column(ForeignKey('systems.id', ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(32))
-    type: Mapped[str] = mapped_column(String(32), default='')
+    type: Mapped[str] = mapped_column(String(32), default='', server_default='')
     body_id: Mapped[int]
-    atmosphere: Mapped[str] = mapped_column(String(32), default='')
+    atmosphere: Mapped[str] = mapped_column(String(32), default='', server_default='')
     volcanism: Mapped[Optional[str]] = mapped_column(String(32))
-    distance: Mapped[float] = mapped_column(default=0.0)
-    mass: Mapped[float] = mapped_column(default=0.0)
-    gravity: Mapped[float] = mapped_column(default=0.0)
+    distance: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    gravity: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     temp: Mapped[Optional[float]]
-    parent_stars: Mapped[str] = mapped_column(default='')
-    bio_signals: Mapped[int] = mapped_column(default=0)
-    materials: Mapped[str] = mapped_column(default='')
-    terraform_state: Mapped[str] = mapped_column(default='')
+    parent_stars: Mapped[str] = mapped_column(default='', server_default='')
+    bio_signals: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    materials: Mapped[str] = mapped_column(default='', server_default='')
+    terraform_state: Mapped[str] = mapped_column(default='', server_default='')
 
     statuses: Mapped[list['PlanetStatus']] = relationship(backref='status', passive_deletes=True)
     gasses: Mapped[list['PlanetGas']] = relationship(backref='gas', passive_deletes=True)
@@ -165,11 +165,11 @@ class PlanetStatus(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    discovered: Mapped[bool] = mapped_column(default=True)
-    was_discovered: Mapped[bool] = mapped_column(default=False)
-    mapped: Mapped[bool] = mapped_column(default=False)
-    was_mapped: Mapped[bool] = mapped_column(default=False)
-    efficient: Mapped[bool] = mapped_column(default=False)
+    discovered: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
+    was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    was_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    efficient: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
                       )
 
@@ -193,8 +193,8 @@ class PlanetFlora(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
     genus: Mapped[str]
-    species: Mapped[str] = mapped_column(default='')
-    color: Mapped[str] = mapped_column(default='')
+    species: Mapped[str] = mapped_column(default='', server_default='')
+    color: Mapped[str] = mapped_column(default='', server_default='')
 
     scans: Mapped[list['FloraScans']] = relationship(backref='scan', passive_deletes=True)
     waypoints: Mapped[list['Waypoint']] = relationship(backref='waypoint', passive_deletes=True)
@@ -209,7 +209,7 @@ class FloraScans(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
-    count: Mapped[int] = mapped_column(default=0)
+    count: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('commander_id', 'flora_id', name='_cmdr_flora_constraint'),
                       )
 
@@ -220,7 +220,7 @@ class Waypoint(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
-    type: Mapped[str] = mapped_column(default='tag')
+    type: Mapped[str] = mapped_column(default='tag', server_default='tag')
     latitude: Mapped[float]
     longitude: Mapped[float]
 
@@ -245,11 +245,11 @@ class NonBodyStatus(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     non_body_id: Mapped[int] = mapped_column(ForeignKey('non_bodies.id', ondelete="CASCADE"))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    discovered: Mapped[bool] = mapped_column(default=True)
-    was_discovered: Mapped[bool] = mapped_column(default=False)
-    mapped: Mapped[bool] = mapped_column(default=True)
-    was_mapped: Mapped[bool] = mapped_column(default=False)
-    efficient: Mapped[bool] = mapped_column(default=False)
+    discovered: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
+    was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    was_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    efficient: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
 
     __table_args__ = (UniqueConstraint('non_body_id', 'commander_id', name='_nonbody_commander_constraint'),
                       )
@@ -261,7 +261,7 @@ class CodexScans(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     region: Mapped[int]
-    biological: Mapped[str] = mapped_column(default='')
+    biological: Mapped[str] = mapped_column(default='', server_default='')
     __table_args__ = (UniqueConstraint('commander_id', 'region', 'biological', name='_cmdr_bio_region_constraint'),)
 
 
