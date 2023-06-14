@@ -290,13 +290,14 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with star data)
         """
 
+        was_discovered = entry['ScanType'] == 'NavBeaconDetail' or entry['WasDiscovered']
         body_short_name = self.get_body_name(entry['BodyName'])
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
-        star_data.set_distance(entry['DistanceFromArrivalLS']).set_type(entry['StarType']) \
+        star_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['StarType']) \
             .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity'])
         if self._cmdr:
-            star_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id)
+            star_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id)
 
     def add_planet(self, entry: Mapping[str, Any]) -> None:
         """
@@ -305,6 +306,7 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with planet data)
         """
 
+        was_discovered = entry['ScanType'] == 'NavBeaconDetail' or entry['WasDiscovered']
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
@@ -313,7 +315,7 @@ class JournalParse:
             .set_terraform_state(entry.get('TerraformState', ''))\
 
         if self._cmdr:
-            body_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
+            body_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id) \
                 .set_was_mapped(entry['WasMapped'], self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
