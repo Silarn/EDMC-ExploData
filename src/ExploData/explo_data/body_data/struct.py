@@ -7,7 +7,7 @@ from typing import Self, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from ...explo_data.db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star, PlanetStatus, \
+from ..db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star, PlanetStatus, \
     StarStatus, NonBody, NonBodyStatus
 
 
@@ -56,6 +56,7 @@ class PlanetData:
         else:
             status = PlanetStatus(planet_id=self._data.id, commander_id=commander_id)
             self._data.statuses.append(status)
+            self._session.commit()
         return status
 
     def get_atmosphere(self) -> str:
@@ -90,7 +91,7 @@ class PlanetData:
         self.commit()
         return self
 
-    def get_distance(self) -> float:
+    def get_distance(self) -> Optional[float]:
         return self._data.distance
 
     def set_distance(self, value: float) -> Self:
@@ -346,6 +347,7 @@ class NonBodyData:
         else:
             status = NonBodyStatus(non_body_id=self._data.id, commander_id=commander_id)
             self._data.statuses.append(status)
+            self._session.commit()
         return status
 
     def is_discovered(self, commander_id: int) -> bool:
@@ -446,6 +448,7 @@ class StarData:
         else:
             status = StarStatus(star_id=self._data.id, commander_id=commander_id)
             self._session.add(status)
+            self._session.commit()
         return status
 
     def get_distance(self) -> Optional[float]:

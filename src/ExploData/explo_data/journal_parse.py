@@ -280,7 +280,8 @@ class JournalParse:
             status = statuses[0]
         else:
             status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
-            self._session.add(status)
+            self._system.statuses.append(status)
+            self._session.commit()
         return status
 
     def add_star(self, entry: Mapping[str, Any]) -> None:
