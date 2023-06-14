@@ -365,9 +365,9 @@ WHERE ROWID IN
           ) r ON t.id = r.id WHERE r.rank > 1
       )
                 ''')
-                add_column(engine, 'systems', Column('x', Float(), nullable=False, default=0.0))
-                add_column(engine, 'systems', Column('y', Float(), nullable=False, default=0.0))
-                add_column(engine, 'systems', Column('z', Float(), nullable=False, default=0.0))
+                add_column(engine, 'systems', Column('x', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'systems', Column('y', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'systems', Column('z', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'systems', Column('region', Integer(), nullable=True))
                 add_column(engine, 'stars', Column('distance', Float(), nullable=True))
                 modify_table(engine, Star)
@@ -375,12 +375,13 @@ WHERE ROWID IN
                 modify_table(engine, PlanetGas)
             if int(version['value']) < 3:
                 run_query(engine, 'DELETE FROM journal_log')
-                add_column(engine, 'systems', Column('body_count', Integer(), nullable=False, default=1))
-                add_column(engine, 'systems', Column('non_body_count', Integer(), nullable=False, default=0))
-                add_column(engine, 'stars', Column('subclass', Integer(), nullable=False, default=0))
-                add_column(engine, 'stars', Column('mass', Float(), nullable=False, default=0.0))
-                add_column(engine, 'planets', Column('mass', Float(), nullable=False, default=0.0))
-                add_column(engine, 'planets', Column('terraform_state', String(), nullable=False, default=''))
+                run_query(engine, 'UPDATE systems SET x=0.0, y=0.0, z=0.0 WHERE x IS NULL')
+                add_column(engine, 'systems', Column('body_count', Integer(), nullable=False, server_default=text('1')))
+                add_column(engine, 'systems', Column('non_body_count', Integer(), nullable=False, server_default=text('0')))
+                add_column(engine, 'stars', Column('subclass', Integer(), nullable=False, server_default=text('0')))
+                add_column(engine, 'stars', Column('mass', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'planets', Column('mass', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'planets', Column('terraform_state', String(), nullable=False, server_default=''))
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
