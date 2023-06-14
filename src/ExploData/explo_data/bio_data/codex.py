@@ -5,10 +5,10 @@
 
 from sqlalchemy import select
 
-from ...explo_data import db
-from ...explo_data.bio_data.genus import data as bio_genus
-from ...explo_data.bio_data.species import data as bio_types
-from ...explo_data.db import CodexScans
+from ExploData.explo_data import db
+from ExploData.explo_data.bio_data.genus import data as bio_genus
+from ExploData.explo_data.bio_data.species import data as bio_types
+from ExploData.explo_data.db import CodexScans
 
 bio_codex_map = {
     '$Codex_Ent_Aleoids_Genus_Name;': {
