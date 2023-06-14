@@ -8,9 +8,10 @@ from typing import Optional, Mapping, MutableMapping
 
 from EDMCLogging import get_plugin_logger
 
+import ExploData.explo_data.journal_parse
 import explo_data.const
-from ExploData.explo_data.journal_parse import JournalParse, fire_event_callbacks
 from explo_data import db
+from explo_data.journal_parse import JournalParse
 
 
 class This:
@@ -57,7 +58,7 @@ def plugin_stop():
     EDMC plugin stop function. Closes open threads and database sessions for clean shutdown.
     """
 
-    explo_data.journal_parse.shutdown()
+    ExploData.explo_data.journal_parse.shutdown()
     db.shutdown()
 
 
@@ -83,6 +84,6 @@ def journal_entry(
     this.journal_processor.set_cmdr(cmdr)
     this.journal_processor.set_system(system, state['StarPos'])
     this.journal_processor.process_entry(entry)
-    fire_event_callbacks(entry)
+    ExploData.explo_data.journal_parse.fire_event_callbacks(entry)
 
     return ''
