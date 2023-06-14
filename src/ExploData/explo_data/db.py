@@ -370,9 +370,6 @@ WHERE ROWID IN
                 add_column(engine, 'systems', Column('z', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'systems', Column('region', Integer(), nullable=True))
                 add_column(engine, 'stars', Column('distance', Float(), nullable=True))
-                modify_table(engine, Star)
-                modify_table(engine, Planet)
-                modify_table(engine, PlanetGas)
             if int(version['value']) < 3:
                 run_query(engine, 'DELETE FROM journal_log')
                 run_query(engine, 'UPDATE systems SET x=0.0, y=0.0, z=0.0 WHERE x IS NULL')
