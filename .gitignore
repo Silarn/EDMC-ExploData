@@ -7,5 +7,5 @@
 venv
 
 # Release prep
-EDMC-BioScan/
+ExploData/
 /*.zip
