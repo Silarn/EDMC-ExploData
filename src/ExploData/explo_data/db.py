@@ -273,9 +273,9 @@ Database migration functions
 
 def modify_table(engine: Engine, table: type[Base], required_tables: Optional[list[type[Base]]] = None):
     new_table_name = f'{table.__tablename__}_new'
+    run_query(engine, 'PRAGMA foreign_keys=off')
     statement = text(f'DROP TABLE IF EXISTS {new_table_name}')  # drop table left over from failed migration
     run_statement(engine, statement)
-    run_query(engine, 'PRAGMA foreign_keys=off')
     metadata = MetaData()
     if required_tables:
         for parent_table in required_tables:
