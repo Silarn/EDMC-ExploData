@@ -11,10 +11,8 @@ import sqlalchemy.exc
 from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, \
     MetaData, Executable, Result, create_engine, event, DefaultClause
 from sqlalchemy.dialects.sqlite import insert
-from sqlalchemy.dialects.sqlite.base import SQLiteDDLCompiler
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql import sqltypes
-from sqlalchemy.sql.compiler import StrSQLTypeCompiler
 from sqlalchemy.sql.ddl import CreateTable
 
 from .const import database_version, plugin_name
@@ -297,23 +295,23 @@ def modify_table(engine: Engine, table: type[Base], required_tables: Optional[li
 
 
 def add_column(engine: Engine, table_name: str, column: Column):
-    column_compile = column.compile(dialect=engine.dialect)
-    column_name = str(column_compile)
+    compiler = column.compile(dialect=engine.dialect)
+    column_name = str(compiler)
     column_type = column.type.compile(engine.dialect)
     null_text = ' NOT NULL' if not column.nullable else ''
     default_value = None
-    if column.server_default:  # type: DefaultClause
-        default: str | DefaultClause = column.server_default
+    if isinstance(column.server_default, DefaultClause):
+        default: DefaultClause = column.server_default
         if isinstance(default.arg, str):
-            default_value = column_compile.render_literal_value(
+            default_value = compiler.render_literal_value(
                 default.arg, sqltypes.STRINGTYPE
             )
         else:
-            default_value = column_compile.process(default.arg)
+            default_value = compiler.process(default.arg)
     default_text = f' DEFAULT {default_value}' if default_value is not None else ''
 
     try:
-        statement = text(f'ALTER TABLE {table_name} DROP COLUMN {column_compile}')
+        statement = text(f'ALTER TABLE {table_name} DROP COLUMN {column_name}')
         run_statement(engine, statement)
     except (OperationalError, sqlalchemy.exc.OperationalError):
         pass
