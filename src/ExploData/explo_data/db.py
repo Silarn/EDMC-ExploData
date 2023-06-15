@@ -2,7 +2,7 @@
 # ExploData module plugin for EDMC
 # Source: https://github.com/Silarn/EDMC-ExploData
 # Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
-
+import os
 import threading
 from sqlite3 import OperationalError
 from typing import Optional
@@ -432,7 +432,8 @@ def init() -> bool:
         old_path = config.app_dir_path / 'bioscan.db'
         engine_path = config.app_dir_path / 'explodata.db'
         if old_path.exists():
-            old_path.rename(engine_path)
+            if not engine_path.exists():
+                old_path.rename(engine_path)
 
         # Set up engine and construct DB
         this.sql_engine = create_engine(f'sqlite:///{engine_path}', connect_args={'timeout': 30})
