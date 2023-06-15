@@ -9,9 +9,12 @@ from typing import Optional
 
 import sqlalchemy.exc
 from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, \
-    MetaData, Executable, Result, create_engine, ColumnDefault, event
+    MetaData, Executable, Result, create_engine, event, DefaultClause
 from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.sqlite.base import SQLiteDDLCompiler
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
+from sqlalchemy.sql import sqltypes
+from sqlalchemy.sql.compiler import StrSQLTypeCompiler
 from sqlalchemy.sql.ddl import CreateTable
 
 from .const import database_version, plugin_name
@@ -294,17 +297,23 @@ def modify_table(engine: Engine, table: type[Base], required_tables: Optional[li
 
 
 def add_column(engine: Engine, table_name: str, column: Column):
-    column_name = column.compile(dialect=engine.dialect)
+    column_compile = column.compile(dialect=engine.dialect)
+    column_name = str(column_compile)
     column_type = column.type.compile(engine.dialect)
-    default: Optional[ColumnDefault] = column.default
-    default_arg: any = default.arg if default.has_arg else None
-    if type(default_arg) is str:
-        default_arg = f"'{default_arg}'"
     null_text = ' NOT NULL' if not column.nullable else ''
-    default_text = f' DEFAULT {default_arg}' if default_arg is not None else ''
+    default_value = None
+    if column.server_default:  # type: DefaultClause
+        default: str | DefaultClause = column.server_default
+        if isinstance(default.arg, str):
+            default_value = column_compile.render_literal_value(
+                default.arg, sqltypes.STRINGTYPE
+            )
+        else:
+            default_value = column_compile.process(default.arg)
+    default_text = f' DEFAULT {default_value}' if default_value is not None else ''
 
     try:
-        statement = text(f'ALTER TABLE {table_name} DROP COLUMN {column_name}')
+        statement = text(f'ALTER TABLE {table_name} DROP COLUMN {column_compile}')
         run_statement(engine, statement)
     except (OperationalError, sqlalchemy.exc.OperationalError):
         pass
@@ -355,16 +364,13 @@ def migrate(engine: Engine) -> bool:
     try:
         if version:  # If the database version is set, perform migrations
             if int(version['value']) < 2:
-                run_query(engine, '''
-DELETE FROM planet_gasses
-WHERE ROWID IN
-      (
-          SELECT t.ROWID FROM planet_gasses t INNER JOIN (
-              SELECT *, RANK() OVER(PARTITION BY planet_id, gas_name ORDER BY id) rank
-              FROM planet_gasses
-          ) r ON t.id = r.id WHERE r.rank > 1
-      )
-                ''')
+                run_query(engine, """
+DELETE FROM planet_gasses WHERE ROWID IN (
+      SELECT t.ROWID FROM planet_gasses t INNER JOIN (
+          SELECT *, RANK() OVER(PARTITION BY planet_id, gas_name ORDER BY id) rank FROM planet_gasses) r
+      ON t.id = r.id WHERE r.rank > 1
+  )
+                """)
                 add_column(engine, 'systems', Column('x', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'systems', Column('y', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'systems', Column('z', Float(), nullable=False, server_default=text('0.0')))
@@ -372,6 +378,13 @@ WHERE ROWID IN
                 add_column(engine, 'stars', Column('distance', Float(), nullable=True))
             if int(version['value']) < 3:
                 run_query(engine, 'DELETE FROM journal_log')
+                run_query(engine, """
+DELETE FROM planets WHERE ROWID IN (
+    SELECT p.ROWID FROM planets AS p INNER JOIN (
+        SELECT *, RANK() OVER(PARTITION BY system_id, name, body_id ORDER BY id) rank FROM planets) t
+    ON p.id = t.id WHERE t.rank > 1
+)
+                """)
                 run_query(engine, 'UPDATE systems SET x=0.0, y=0.0, z=0.0 WHERE x IS NULL')
                 add_column(engine, 'systems', Column('body_count', Integer(), nullable=False, server_default=text('1')))
                 add_column(engine, 'systems', Column('non_body_count', Integer(), nullable=False, server_default=text('0')))
