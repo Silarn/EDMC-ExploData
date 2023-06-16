@@ -451,6 +451,10 @@ def shutdown() -> None:
     """
 
     try:
+        connect = this.sql_engine.connect()
+        connect.execute(text('VACUUM'))  # Optimize size of db file
+        connect.commit()
+        connect.close()
         this.sql_session_factory.close()
         this.sql_engine.dispose()
     except Exception as ex:
