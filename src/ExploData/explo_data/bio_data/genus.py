@@ -1,6 +1,6 @@
-from typing import MutableMapping
+from typing import Mapping
 
-data: MutableMapping = {
+data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Aleoids_Genus_Name;': {
         'name': 'Aleoida',
         'distance': 150,
