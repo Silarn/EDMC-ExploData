@@ -272,6 +272,16 @@ Database migration functions
 
 
 def modify_table(engine: Engine, table: type[Base], required_tables: Optional[list[type[Base]]] = None):
+    """
+    Creates a fresh copy of the target table, copies the old data into it, and replaces the old table.
+    This is the only way to fully update table and column definitions in SQLite.
+
+    :param engine: The SQLAlchemy engine
+    :param table: The base class type of the table to be recreated
+    :param required_tables: (Optional) A list of base class types for tables that
+                            are relationship requirements of the target table
+    """
+
     new_table_name = f'{table.__tablename__}_new'
     run_query(engine, 'PRAGMA foreign_keys=off')
     statement = text(f'DROP TABLE IF EXISTS {new_table_name}')  # drop table left over from failed migration
@@ -295,6 +305,14 @@ def modify_table(engine: Engine, table: type[Base], required_tables: Optional[li
 
 
 def add_column(engine: Engine, table_name: str, column: Column):
+    """
+    Add a column to an existing table
+
+    :param engine: The SQLAlchemy engine
+    :param table_name: The name of the table to modify
+    :param column: The SQLAlchemy column object to add to the table
+    """
+
     compiler = column.compile(dialect=engine.dialect)
     column_name = str(compiler)
     column_type = column.type.compile(engine.dialect)
@@ -320,10 +338,24 @@ def add_column(engine: Engine, table_name: str, column: Column):
 
 
 def run_query(engine: Engine, query: str) -> Result:
+    """
+    Directly execute a query string.
+
+    :param engine: The SQLAlchemy engine
+    :param query: The string to be executed
+    """
+
     return run_statement(engine, text(query))
 
 
 def run_statement(engine: Engine, statement: Executable) -> Result:
+    """
+    Execute a SQLAlchemy statement. Creates a fresh connection, commits, and closes the connection.
+
+    :param engine: The SQLAlchemy engine
+    :param statement: The SQLAlchemy statement to be executed
+    """
+
     connection = engine.connect()
     result = connection.execute(statement)
     connection.commit()
@@ -332,6 +364,13 @@ def run_statement(engine: Engine, statement: Executable) -> Result:
 
 
 def affix_schemas(engine: Engine) -> None:
+    """
+    Run general table migrations for the entire database structure. This should affix any changes to
+    column defaults, restrictions, relationships, and other structural changes.
+
+    :param engine: The SQLAlchemy engine
+    """
+
     modify_table(engine, Metadata)
     modify_table(engine, JournalLog)
     modify_table(engine, Commander)
