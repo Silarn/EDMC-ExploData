@@ -416,6 +416,27 @@ DELETE FROM planet_gasses WHERE ROWID IN (
             if int(version['value']) < 3:
                 run_query(engine, 'DELETE FROM journal_log')
                 run_query(engine, """
+DELETE FROM planet_status WHERE planet_id IN (
+    SELECT p.ROWID FROM planets AS p INNER JOIN (
+        SELECT *, RANK() OVER(PARTITION BY system_id, name, body_id ORDER BY id) rank FROM planets) t
+    ON p.id = t.id WHERE t.rank > 1
+)
+                """)
+                run_query(engine, """
+DELETE FROM planet_flora WHERE planet_id IN (
+    SELECT p.ROWID FROM planets AS p INNER JOIN (
+        SELECT *, RANK() OVER(PARTITION BY system_id, name, body_id ORDER BY id) rank FROM planets) t
+    ON p.id = t.id WHERE t.rank > 1
+)
+                """)
+                run_query(engine, """
+DELETE FROM planet_gasses WHERE planet_id IN (
+    SELECT p.ROWID FROM planets AS p INNER JOIN (
+        SELECT *, RANK() OVER(PARTITION BY system_id, name, body_id ORDER BY id) rank FROM planets) t
+    ON p.id = t.id WHERE t.rank > 1
+)
+                """)
+                run_query(engine, """
 DELETE FROM planets WHERE ROWID IN (
     SELECT p.ROWID FROM planets AS p INNER JOIN (
         SELECT *, RANK() OVER(PARTITION BY system_id, name, body_id ORDER BY id) rank FROM planets) t

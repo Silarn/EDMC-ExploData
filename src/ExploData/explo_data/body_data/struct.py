@@ -483,7 +483,7 @@ class StarData:
         self.commit()
         return self
 
-    def get_luminosity(self):
+    def get_luminosity(self) -> str:
         return self._data.luminosity
 
     def set_luminosity(self, value: str) -> Self:
