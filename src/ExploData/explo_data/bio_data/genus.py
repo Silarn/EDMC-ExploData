@@ -571,10 +571,11 @@ data: Mapping[str, Mapping[str, any]] = {
                 },
                 '$Codex_Ent_Stratum_04_Name;': {
                     'star': {
+                        'F': 'Emerald',  # Here to get color from base ID
                         'A': 'Emerald',
                         'N': 'Emerald',
                         'T': 'Emerald',
-                        'F': 'Emerald'  # Here to get color from base ID
+                        'B': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Stratum_05_Name;': {
