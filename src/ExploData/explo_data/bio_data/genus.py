@@ -617,7 +617,6 @@ data: Mapping[str, Mapping[str, any]] = {
                 },
                 '$Codex_Ent_Stratum_04_Name;': {
                     'star': {
-                        'F': 'Emerald',  # Here to get color from base ID
                         'B': 'Emerald',
                         'A': 'Emerald',
                         'N': 'Emerald',
@@ -680,6 +679,15 @@ data: Mapping[str, Mapping[str, any]] = {
                         'W': 'Red'
                     }
                 },
+            }
+        }
+    },
+    '$Codex_Ent_Stratum_04_Name;': {  # Aranaemus breaks typical naming convention
+        'name': 'Stratum',
+        'distance': 500,
+        'colors': {
+            'star': {
+                'F': 'Emerald'
             }
         }
     },

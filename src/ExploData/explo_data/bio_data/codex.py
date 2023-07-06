@@ -127,11 +127,13 @@ bio_codex_map = {
         '$Codex_Ent_Stratum_01_',
         '$Codex_Ent_Stratum_02_',
         '$Codex_Ent_Stratum_03_',
-        '$Codex_Ent_Stratum_04_',
         '$Codex_Ent_Stratum_05_',
         '$Codex_Ent_Stratum_06_',
         '$Codex_Ent_Stratum_07_',
         '$Codex_Ent_Stratum_08_',
+    },
+    '$Codex_Ent_Stratum_04_Name;': {
+        '$Codex_Ent_Stratum_04_',
     },
     '$Codex_Ent_Tube_Name;': {
         '$Codex_Ent_Tube_',
