@@ -14,7 +14,9 @@ data: Mapping[str, Mapping[str, any]] = {
                 'L': 'Lime',
                 'T': 'Sage',
                 'TTS': 'Mauve',
-                'Y': 'Teal',
+                'D': 'Indigo',
+                'W': 'Grey',
+                'Y': 'Amethyst',
                 'N': 'Ocher'
             }
         }
@@ -35,7 +37,9 @@ data: Mapping[str, Mapping[str, any]] = {
                         'M': 'Teal',
                         'L': 'Sage',
                         'T': 'Red',
+                        'Y': 'Mauve',
                         'TTS': 'Maroon',
+                        'AeBe': 'Orange',
                         'W': 'Amethyst',
                         'D': 'Ocher',
                         'N': 'Indigo'
@@ -46,6 +50,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'antimony': 'Magenta',
                         'polonium': 'Gold',
                         'ruthenium': 'Orange',
+                        'technetium': 'Cyan',
                         'tellurium': 'Green',
                         'yttrium': 'Cobalt'
                     }
@@ -91,7 +96,9 @@ data: Mapping[str, Mapping[str, any]] = {
                         'M': 'Teal',
                         'L': 'Sage',
                         'T': 'Red',
+                        'Y': 'Mauve',
                         'TTS': 'Maroon',
+                        'AeBe': 'Orange',
                         'W': 'Amethyst',
                         'D': 'Ocher',
                         'N': 'Indigo'
@@ -158,7 +165,9 @@ data: Mapping[str, Mapping[str, any]] = {
                         'M': 'Teal',
                         'L': 'Sage',
                         'T': 'Red',
+                        'Y': 'Mauve',
                         'TTS': 'Maroon',
+                        'AeBe': 'Orange',
                         'W': 'Amethyst',
                         'D': 'Ocher',
                         'N': 'Indigo'
@@ -182,13 +191,17 @@ data: Mapping[str, Mapping[str, any]] = {
         'distance': 300,
         'colors': {
             'star': {
+                'O': 'Grey',
                 'A': 'Green',
                 'F': 'Yellow',
                 'G': 'Teal',
                 'M': 'Amethyst',
                 'L': 'Mauve',
                 'T': 'Orange',
+                'Y': 'Ocher',
                 'TTS': 'Red',
+                'D': 'Turquoise',
+                'W': 'Indigo',
                 'N': 'Sage',
             }
         }
@@ -198,12 +211,15 @@ data: Mapping[str, Mapping[str, any]] = {
         'distance': 150,
         'colors': {
             'star': {
+                'B': 'Maroon',
                 'A': 'Orange',
                 'F': 'Mauve',
                 'G': 'Amethyst',
                 'K': 'Grey',
                 'M': 'Turquoise',
+                'Y': 'Green',
                 'L': 'Teal',
+                'W': 'Lime',
                 'N': 'Yellow',
             }
         }
@@ -225,28 +241,40 @@ data: Mapping[str, Mapping[str, any]] = {
                 },
                 '$Codex_Ent_Conchas_02_Name;': {
                     'star': {
+                        'B': 'Indigo',
                         'A': 'Teal',
                         'F': 'Grey',
                         'G': 'Turquoise',
                         'K': 'Red',
                         'L': 'Orange',
-                        'N': 'Emerald',
+                        'Y': 'Yellow',
+                        'W': 'Lime',
+                        'D': 'Green',
+                        'N': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Conchas_03_Name;': {
                     'star': {
+                        'B': 'Indigo',
                         'A': 'Teal',
                         'F': 'Grey',
                         'G': 'Turquoise',
                         'K': 'Red',
                         'L': 'Orange',
-                        'N': 'Emerald',
+                        'Y': 'Yellow',
+                        'W': 'Lime',
+                        'D': 'Green',
+                        'N': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Conchas_04_Name;': {
                     'element': {
                         'antimony': 'Peach',
+                        'polonium': 'Red',
                         'ruthenium': 'Orange',
+                        'technetium': 'White',
+                        'tellurium': 'Yellow',
+                        'yttrium': 'Gold'
                     }
                 }
             }
@@ -286,6 +314,7 @@ data: Mapping[str, Mapping[str, any]] = {
         'distance': 500,
         'colors': {
             'star': {
+                'O': 'Grey',
                 'B': 'Lime',
                 'A': 'Green',
                 'F': 'Yellow',
@@ -296,6 +325,7 @@ data: Mapping[str, Mapping[str, any]] = {
                 'T': 'Orange',
                 'TTS': 'Red',
                 'Y': 'Ocher',
+                'W': 'Indigo',
                 'D': 'Turquoise',
                 'N': 'Sage',
                 'AeBe': 'Maroon'
@@ -319,6 +349,7 @@ data: Mapping[str, Mapping[str, any]] = {
                 },
                 '$Codex_Ent_Fumerolas_02_Name;': {
                     'element': {
+                        'cadmium': 'Aquamarine',
                         'mercury': 'Lime',
                         'molybdenum': 'Blue',
                         'niobium': 'White',
@@ -405,12 +436,14 @@ data: Mapping[str, Mapping[str, any]] = {
             'species': {
                 '$Codex_Ent_Osseus_01_Name;': {
                     'star': {
+                        'O': 'Yellow',
                         'A': 'Lime',
                         'F': 'Turquoise',
                         'G': 'Grey',
                         'K': 'Indigo',
                         'T': 'Emerald',
-                        'TTS': 'Green',
+                        'Y': 'Maroon',
+                        'TTS': 'Green'
                     }
                 },
                 '$Codex_Ent_Osseus_02_Name;': {
@@ -425,12 +458,14 @@ data: Mapping[str, Mapping[str, any]] = {
                 },
                 '$Codex_Ent_Osseus_03_Name;': {
                     'star': {
+                        'O': 'Yellow',
                         'A': 'Lime',
                         'F': 'Turquoise',
                         'G': 'Grey',
                         'K': 'Indigo',
                         'T': 'Emerald',
-                        'TTS': 'Green',
+                        'Y': 'Maroon',
+                        'TTS': 'Green'
                     }
                 },
                 '$Codex_Ent_Osseus_04_Name;': {
@@ -445,22 +480,26 @@ data: Mapping[str, Mapping[str, any]] = {
                 },
                 '$Codex_Ent_Osseus_05_Name;': {
                     'star': {
+                        'O': 'Yellow',
                         'A': 'Lime',
                         'F': 'Turquoise',
                         'G': 'Grey',
                         'K': 'Indigo',
                         'T': 'Emerald',
-                        'TTS': 'Green',
+                        'Y': 'Maroon',
+                        'TTS': 'Green'
                     }
                 },
                 '$Codex_Ent_Osseus_06_Name;': {
                     'star': {
+                        'O': 'Yellow',
                         'A': 'Lime',
                         'F': 'Turquoise',
                         'G': 'Grey',
                         'K': 'Indigo',
                         'T': 'Emerald',
-                        'TTS': 'Green',
+                        'Y': 'Maroon',
+                        'TTS': 'Green'
                     }
                 },
             }
@@ -473,27 +512,35 @@ data: Mapping[str, Mapping[str, any]] = {
             'species': {
                 '$Codex_Ent_Recepta_01_Name;': {
                     'star': {
+                        'B': 'Turquoise',
                         'A': 'Amethyst',
                         'F': 'Mauve',
                         'G': 'Orange',
                         'K': 'Red',
                         'M': 'Maroon',
                         'T': 'Teal',
+                        'TTS': 'Sage',
+                        'L': 'Ochre',
+                        'AeBe': 'Grey',
+                        'N': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Recepta_02_Name;': {
                     'element': {
                         'cadmium': 'Lime',
-                        'mercury': 'Gold',
-                        'molybdenum': 'Orange',
+                        'mercury': 'Cyan',
+                        'molybdenum': 'Gold',
                         'niobium': 'Mulberry',
-                        'tungsten': 'Red'
+                        'tungsten': 'Red',
+                        'tin': 'Orange'
                     }
                 },
                 '$Codex_Ent_Recepta_03_Name;': {
                     'element': {
                         'antimony': 'Lime',
                         'polonium': 'White',
+                        'ruthenium': 'Yellow',
+                        'technetium': 'Aquamarine',
                         'tellurium': 'Cyan',
                         'yttrium': 'Green'
                     }
@@ -507,12 +554,14 @@ data: Mapping[str, Mapping[str, any]] = {
         'distance': 150,
         'colors': {
             'star': {
+                'O': 'Yellow',
                 'B': 'Lime',
                 'F': 'Green',
                 'G': 'Emerald',
                 'M': 'Grey',
                 'L': 'Teal',
                 'TTS': 'Mauve',
+                'W': 'Orange',
                 'D': 'Indigo',
                 'N': 'Red'
             }
@@ -530,13 +579,12 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
                 '$Codex_Ent_Stratum_02_Name;': {
@@ -545,13 +593,12 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
                 '$Codex_Ent_Stratum_03_Name;': {
@@ -560,22 +607,21 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
                 '$Codex_Ent_Stratum_04_Name;': {
                     'star': {
                         'F': 'Emerald',  # Here to get color from base ID
+                        'B': 'Emerald',
                         'A': 'Emerald',
                         'N': 'Emerald',
-                        'T': 'Emerald',
-                        'B': 'Emerald'
+                        'T': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Stratum_05_Name;': {
@@ -584,13 +630,12 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
                 '$Codex_Ent_Stratum_06_Name;': {
@@ -599,13 +644,12 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
                 '$Codex_Ent_Stratum_07_Name;': {
@@ -614,13 +658,12 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
                 '$Codex_Ent_Stratum_08_Name;': {
@@ -629,13 +672,12 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Lime',
                         'M': 'Green',
                         'L': 'Turquoise',
+                        'Y': 'Indigo',
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
                         'AeBe': 'Teal',
-                        'W': 'Red',
-                        'N': 'Indigo',
-                        'H': 'Indigo'
+                        'W': 'Red'
                     }
                 },
             }
@@ -647,6 +689,7 @@ data: Mapping[str, Mapping[str, any]] = {
         'distance': 800,
         'colors': {
             'star': {
+                'O': 'Green',
                 'B': 'Emerald',
                 'A': 'Indigo',
                 'F': 'Grey',
@@ -656,6 +699,8 @@ data: Mapping[str, Mapping[str, any]] = {
                 'L': 'Turquoise',
                 'T': 'Mauve',
                 'TTS': 'Ocher',
+                'W': 'Lime',
+                'D': 'Yellow',
                 'N': 'Amethyst'
             }
         }
@@ -671,8 +716,10 @@ data: Mapping[str, Mapping[str, any]] = {
                 'M': 'Emerald',
                 'L': 'Sage',
                 'T': 'Teal',
+                'Y': 'Red',
+                'W': 'Orange',
                 'D': 'Maroon',
-                'H': 'Red'
+                'N': 'Yellow'
             }
         }
     },
