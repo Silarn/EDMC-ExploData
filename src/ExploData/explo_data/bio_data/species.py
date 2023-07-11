@@ -118,13 +118,11 @@ data: dict[str, set[str]] = {
         '$Codex_Ent_Stratum_01_Name;',
         '$Codex_Ent_Stratum_02_Name;',
         '$Codex_Ent_Stratum_03_Name;',
+        '$Codex_Ent_Stratum_04_Name;',
         '$Codex_Ent_Stratum_05_Name;',
         '$Codex_Ent_Stratum_06_Name;',
         '$Codex_Ent_Stratum_07_Name;',
         '$Codex_Ent_Stratum_08_Name;'
-    },
-    '$Codex_Ent_Stratum_04_Name;': {
-        '$Codex_Ent_Stratum_04_Name;'
     },
     '$Codex_Ent_Tube_Name;': {
         '$Codex_Ent_Tube_Name;',

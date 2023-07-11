@@ -127,13 +127,11 @@ bio_codex_map = {
         '$Codex_Ent_Stratum_01_',
         '$Codex_Ent_Stratum_02_',
         '$Codex_Ent_Stratum_03_',
+        '$Codex_Ent_Stratum_04_',
         '$Codex_Ent_Stratum_05_',
         '$Codex_Ent_Stratum_06_',
         '$Codex_Ent_Stratum_07_',
         '$Codex_Ent_Stratum_08_',
-    },
-    '$Codex_Ent_Stratum_04_Name;': {
-        '$Codex_Ent_Stratum_04_',
     },
     '$Codex_Ent_Tube_Name;': {
         '$Codex_Ent_Tube_',
@@ -225,13 +223,16 @@ def parse_variant(name: str) -> tuple[str, str, str]:
                         if color_type in bio_color_suffix_map:
                             match bio_color_suffix_map[color_type]:
                                 case 'star':
-                                    try:
-                                        color = bio_genus[genus]['colors']['species'][species]['star'][color_type]
-                                    except KeyError:
+                                    if species in bio_genus:
+                                        color = bio_genus[species]['colors']['star'][color_type]
+                                    else:
                                         try:
-                                            color = bio_genus[genus]['colors']['star'][color_type]
+                                            color = bio_genus[genus]['colors']['species'][species]['star'][color_type]
                                         except KeyError:
-                                            color = ''
+                                            try:
+                                                color = bio_genus[genus]['colors']['star'][color_type]
+                                            except KeyError:
+                                                color = ''
                                 case 'element':
                                     try:
                                         color = bio_genus[genus]['colors']['species'][species]['element'][color_type.lower()]
