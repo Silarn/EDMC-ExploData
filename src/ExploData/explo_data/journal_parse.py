@@ -28,7 +28,7 @@ from .RegionMap import findRegion
 
 from ExploData.explo_data import const
 from .bio_data.codex import parse_variant, set_codex
-from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus
+from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus, PlanetStatus
 from .body_data.struct import PlanetData, StarData, NonBodyData
 
 JOURNAL_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.[0-9]{2,4}-?[0-9]{2}-?[0-9]{2}T?[0-9]{2}[0-9]{2}[0-9]{2}'
@@ -196,6 +196,14 @@ class JournalParse:
                 used = int(entry['ProbesUsed'])
                 body.set_mapped(True, self._cmdr.id)\
                     .set_efficient(target >= used, self._cmdr.id)
+                if self.get_system_status().fully_scanned:
+                    count = 0
+                    for planet in self._system.planets:
+                        planet_status = self.get_planet_status(planet)
+                        if planet_status.mapped:
+                            count += 1
+                    if len(self._system.planets) == count:
+                        self.get_system_status().fully_mapped = True
                 self._session.commit()
             case 'scanorganic':
                 if not self._system or not self._cmdr:
@@ -281,6 +289,20 @@ class JournalParse:
         else:
             status = SystemStatus(system_id=self._system.id, commander_id=self._cmdr.id)
             self._system.statuses.append(status)
+            self._session.commit()
+        return status
+
+    def get_planet_status(self, planet: Planet) -> PlanetStatus:
+        """
+        Fetch or create the SystemStatus data attached to the local System object
+        """
+        statuses: list[PlanetStatus] = planet.statuses
+        statuses = list(filter(lambda item: item.commander_id == self._cmdr.id, statuses))
+        if len(statuses):
+            status = statuses[0]
+        else:
+            status = PlanetStatus(planet_id=planet.id, commander_id=self._cmdr.id)
+            planet.statuses.append(status)
             self._session.commit()
         return status
 
