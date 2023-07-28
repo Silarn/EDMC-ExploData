@@ -5,4 +5,4 @@
 
 plugin_name: str = 'ExploData'
 plugin_version: str = '1.0.7'
-database_version: int = 3
+database_version: int = 4

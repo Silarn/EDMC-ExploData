@@ -147,6 +147,8 @@ class Planet(Base):
     mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     gravity: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     temp: Mapped[Optional[float]]
+    pressure: Mapped[Optional[float]]
+    radius: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     parent_stars: Mapped[str] = mapped_column(default='', server_default='')
     bio_signals: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     materials: Mapped[str] = mapped_column(default='', server_default='')
@@ -450,6 +452,10 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'stars', Column('mass', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'planets', Column('mass', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'planets', Column('terraform_state', String(), nullable=False, server_default=''))
+            if int(version['value']) < 4:
+                run_query(engine, 'DELETE FROM journal_log')
+                add_column(engine, 'planets', Column('pressure', Float(), nullable=True))
+                add_column(engine, 'planets', Column('radius', Float(), nullable=False, server_default=text('0.0')))
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)

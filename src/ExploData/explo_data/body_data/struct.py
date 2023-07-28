@@ -123,6 +123,22 @@ class PlanetData:
         self.commit()
         return self
 
+    def get_pressure(self) -> Optional[float]:
+        return self._data.pressure
+
+    def set_pressure(self, value: Optional[float]) -> Self:
+        self._data.pressure = value
+        self.commit()
+        return self
+
+    def get_radius(self) -> float:
+        return self._data.radius
+
+    def set_radius(self, value: float) -> Self:
+        self._data.radius = value
+        self.commit()
+        return self
+
     def get_bio_signals(self) -> int:
         return self._data.bio_signals
 

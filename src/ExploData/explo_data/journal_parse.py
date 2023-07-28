@@ -334,8 +334,9 @@ class JournalParse:
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
             .set_mass(entry['MassEM']).set_gravity(entry['SurfaceGravity']) \
-            .set_temp(entry.get('SurfaceTemperature', None)).set_volcanism(entry.get('Volcanism', None)) \
-            .set_terraform_state(entry.get('TerraformState', ''))\
+            .set_temp(entry.get('SurfaceTemperature', None)).set_pressure(entry.get('SurfacePressure', None)) \
+            .set_radius(entry['Radius']).set_volcanism(entry.get('Volcanism', None)) \
+            .set_terraform_state(entry.get('TerraformState', ''))
 
         if self._cmdr:
             body_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id) \
