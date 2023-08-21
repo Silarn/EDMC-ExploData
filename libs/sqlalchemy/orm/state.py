@@ -578,7 +578,7 @@ class InstanceState(interfaces.InspectionAttrInfo, Generic[_O]):
         return self._pending_mutations[key]
 
     def __getstate__(self) -> Dict[str, Any]:
-        state_dict = {
+        state_dict: Dict[str, Any] = {
             "instance": self.obj(),
             "class_": self.class_,
             "committed_state": self.committed_state,
@@ -824,8 +824,8 @@ class InstanceState(interfaces.InspectionAttrInfo, Generic[_O]):
     def unloaded(self) -> Set[str]:
         """Return the set of keys which do not have a loaded value.
 
-        This includes expired attributes and any other attribute that
-        was never populated or modified.
+        This includes expired attributes and any other attribute that was never
+        populated or modified.
 
         """
         return (
@@ -835,11 +835,16 @@ class InstanceState(interfaces.InspectionAttrInfo, Generic[_O]):
         )
 
     @property
+    @util.deprecated(
+        "2.0",
+        "The :attr:`.InstanceState.unloaded_expirable` attribute is "
+        "deprecated.  Please use :attr:`.InstanceState.unloaded`.",
+    )
     def unloaded_expirable(self) -> Set[str]:
-        """Return the set of keys which do not have a loaded value.
+        """Synonymous with :attr:`.InstanceState.unloaded`.
 
-        This includes expired attributes and any other attribute that
-        was never populated or modified.
+        This attribute was added as an implementation-specific detail at some
+        point and should be considered to be private.
 
         """
         return self.unloaded
@@ -1116,6 +1121,9 @@ class PendingCollection:
     def __init__(self) -> None:
         self.deleted_items = util.IdentitySet()
         self.added_items = util.OrderedIdentitySet()
+
+    def merge_with_history(self, history: History) -> History:
+        return history._merge(self.added_items, self.deleted_items)
 
     def append(self, value: Any) -> None:
         if value in self.deleted_items:

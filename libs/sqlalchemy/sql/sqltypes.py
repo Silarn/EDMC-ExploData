@@ -804,7 +804,6 @@ class DateTime(
 
     @util.memoized_property
     def _expression_adaptations(self):
-
         # Based on
         # https://www.postgresql.org/docs/current/static/functions-datetime.html.
 
@@ -1464,7 +1463,11 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
 
         super().__init__(length=length)
 
-        if self.enum_class:
+        # assign name to the given enum class if no other name, and this
+        # enum is not an "empty" enum.  if the enum is "empty" we assume
+        # this is a template enum that will be used to generate
+        # new Enum classes.
+        if self.enum_class and values:
             kw.setdefault("name", self.enum_class.__name__.lower())
         SchemaType.__init__(
             self,
@@ -1515,7 +1518,6 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
         matched_on: _MatchedOnType,
         matched_on_flattened: Type[Any],
     ) -> Optional[Enum]:
-
         # "generic form" indicates we were placed in a type map
         # as ``sqlalchemy.Enum(enum.Enum)`` which indicates we need to
         # get enumerated values from the datatype
@@ -1551,11 +1553,9 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
             enum_args = self._enums_argument
 
         # make a new Enum that looks like this one.
-        # pop the "name" so that it gets generated based on the enum
         # arguments or other rules
         kw = self._make_enum_kw({})
 
-        kw.pop("name", None)
         if native_enum is False:
             kw["native_enum"] = False
 
@@ -1673,7 +1673,8 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
 
     def _make_enum_kw(self, kw):
         kw.setdefault("validate_strings", self.validate_strings)
-        kw.setdefault("name", self.name)
+        if self.name:
+            kw.setdefault("name", self.name)
         kw.setdefault("schema", self.schema)
         kw.setdefault("inherit_schema", self.inherit_schema)
         kw.setdefault("metadata", self.metadata)
@@ -2051,7 +2052,7 @@ class Interval(Emulated, _AbstractInterval, TypeDecorator[dt.timedelta]):
     """
 
     impl = DateTime
-    epoch = dt.datetime.utcfromtimestamp(0)
+    epoch = dt.datetime.fromtimestamp(0, dt.timezone.utc).replace(tzinfo=None)
     cache_ok = True
 
     def __init__(
@@ -2868,7 +2869,6 @@ class ARRAY(
         type: ARRAY
 
         def _setup_getitem(self, index):
-
             arr_type = self.type
 
             return_type: TypeEngine[Any]
@@ -3159,7 +3159,6 @@ class TupleType(TypeEngine[Tuple[Any, ...]]):
     def coerce_compared_value(
         self, op: Optional[OperatorType], value: Any
     ) -> TypeEngine[Any]:
-
         if value is type_api._NO_VALUE_IN_LIST:
             return super().coerce_compared_value(op, value)
         else:
@@ -3674,7 +3673,6 @@ class Uuid(Emulated, TypeEngine[_UUID_RETURN]):
 
                 return process
         else:
-
             if not self.as_uuid:
 
                 def process(value):

@@ -11,7 +11,7 @@ r"""
 
 .. dialect:: mysql
     :name: MySQL / MariaDB
-    :full_support: 5.6, 5.7, 8.0 / 10.4, 10.5
+    :full_support: 5.6, 5.7, 8.0 / 10.8, 10.9
     :normal_support: 5.6+ / 10+
     :best_effort: 5.0.2+ / 5.0.2+
 
@@ -1067,6 +1067,7 @@ from ...types import BINARY
 from ...types import BLOB
 from ...types import BOOLEAN
 from ...types import DATE
+from ...types import UUID
 from ...types import VARBINARY
 from ...util import topological
 
@@ -1155,6 +1156,7 @@ ischema_names = {
     "tinyblob": TINYBLOB,
     "tinyint": TINYINT,
     "tinytext": TINYTEXT,
+    "uuid": UUID,
     "varbinary": VARBINARY,
     "varchar": VARCHAR,
     "year": YEAR,
@@ -1179,7 +1181,6 @@ class MySQLExecutionContext(default.DefaultExecutionContext):
 
 
 class MySQLCompiler(compiler.SQLCompiler):
-
     render_table_with_column_in_update_from = True
     """Overridden from base SQLCompiler value"""
 
@@ -1581,7 +1582,6 @@ class MySQLCompiler(compiler.SQLCompiler):
             tmp = " FOR UPDATE"
 
         if select._for_update_arg.of and self.dialect.supports_for_update_of:
-
             tables = util.OrderedSet()
             for c in select._for_update_arg.of:
                 tables.update(sql_util.surface_selectables_only(c))
@@ -1705,7 +1705,7 @@ class MySQLCompiler(compiler.SQLCompiler):
 
     def _mariadb_regexp_flags(self, flags, pattern, **kw):
         return "CONCAT('(?', %s, ')', %s)" % (
-            self.process(flags, **kw),
+            self.render_literal_value(flags, sqltypes.STRINGTYPE),
             self.process(pattern, **kw),
         )
 
@@ -1723,7 +1723,7 @@ class MySQLCompiler(compiler.SQLCompiler):
             text = "REGEXP_LIKE(%s, %s, %s)" % (
                 self.process(binary.left, **kw),
                 self.process(binary.right, **kw),
-                self.process(flags, **kw),
+                self.render_literal_value(flags, sqltypes.STRINGTYPE),
             )
             if op_string == " NOT REGEXP ":
                 return "NOT %s" % text
@@ -1738,25 +1738,22 @@ class MySQLCompiler(compiler.SQLCompiler):
 
     def visit_regexp_replace_op_binary(self, binary, operator, **kw):
         flags = binary.modifiers["flags"]
-        replacement = binary.modifiers["replacement"]
         if flags is None:
-            return "REGEXP_REPLACE(%s, %s, %s)" % (
+            return "REGEXP_REPLACE(%s, %s)" % (
                 self.process(binary.left, **kw),
                 self.process(binary.right, **kw),
-                self.process(replacement, **kw),
             )
         elif self.dialect.is_mariadb:
             return "REGEXP_REPLACE(%s, %s, %s)" % (
                 self.process(binary.left, **kw),
-                self._mariadb_regexp_flags(flags, binary.right),
-                self.process(replacement, **kw),
+                self._mariadb_regexp_flags(flags, binary.right.clauses[0]),
+                self.process(binary.right.clauses[1], **kw),
             )
         else:
-            return "REGEXP_REPLACE(%s, %s, %s, %s)" % (
+            return "REGEXP_REPLACE(%s, %s, %s)" % (
                 self.process(binary.left, **kw),
                 self.process(binary.right, **kw),
-                self.process(replacement, **kw),
-                self.process(flags, **kw),
+                self.render_literal_value(flags, sqltypes.STRINGTYPE),
             )
 
 
@@ -1848,7 +1845,6 @@ class MySQLDDLCompiler(compiler.DDLCompiler):
         ):
             arg = opts[opt]
             if opt in _reflection._options_of_type_string:
-
                 arg = self.sql_compiler.render_literal_value(
                     arg, sqltypes.String()
                 )
@@ -1940,7 +1936,6 @@ class MySQLDDLCompiler(compiler.DDLCompiler):
 
         length = index.dialect_options[self.dialect.name]["length"]
         if length is not None:
-
             if isinstance(length, dict):
                 # length value can be a (column_name --> integer value)
                 # mapping specifying the prefix length for each column of the
@@ -2909,7 +2904,6 @@ class MySQLDialect(default.DefaultDialect):
 
     @reflection.cache
     def get_table_options(self, connection, table_name, schema=None, **kw):
-
         parsed_state = self._parsed_state_or_create(
             connection, table_name, schema, **kw
         )
@@ -2942,7 +2936,6 @@ class MySQLDialect(default.DefaultDialect):
 
     @reflection.cache
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-
         parsed_state = self._parsed_state_or_create(
             connection, table_name, schema, **kw
         )
@@ -3021,7 +3014,6 @@ class MySQLDialect(default.DefaultDialect):
         ]
 
         if col_tuples:
-
             correct_for_wrong_fk_case = connection.execute(
                 sql.text(
                     """
@@ -3092,7 +3084,6 @@ class MySQLDialect(default.DefaultDialect):
 
     @reflection.cache
     def get_indexes(self, connection, table_name, schema=None, **kw):
-
         parsed_state = self._parsed_state_or_create(
             connection, table_name, schema, **kw
         )
@@ -3168,7 +3159,6 @@ class MySQLDialect(default.DefaultDialect):
 
     @reflection.cache
     def get_view_definition(self, connection, view_name, schema=None, **kw):
-
         charset = self._connection_charset
         full_name = ".".join(
             self.identifier_preparer._quote_free_identifiers(schema, view_name)

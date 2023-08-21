@@ -333,6 +333,15 @@ def _expand_cloned(
     return itertools.chain(*[x._cloned_set for x in elements])
 
 
+def _de_clone(
+    elements: Iterable[_CLE],
+) -> Iterable[_CLE]:
+    for x in elements:
+        while x._is_clone_of is not None:
+            x = x._is_clone_of
+        yield x
+
+
 def _cloned_intersection(a: Iterable[_CLE], b: Iterable[_CLE]) -> Set[_CLE]:
     """return the intersection of sets a and b, counting
     any overlap between 'cloned' predecessors.
@@ -1036,7 +1045,6 @@ class Executable(roles.StatementRole):
     is_dml = False
 
     if TYPE_CHECKING:
-
         __visit_name__: str
 
         def _compile_w_cache(
@@ -1872,7 +1880,6 @@ class ColumnCollection(Generic[_COLKEY, _COL_co]):
                     )
 
                 if len(current_intersection) > len(selected_intersection):
-
                     # 'current' has a larger field of correspondence than
                     # 'selected'. i.e. selectable.c.a1_x->a1.c.x->table.c.x
                     # matches a1.c.x->table.c.x better than
@@ -1949,7 +1956,6 @@ class DedupeColumnCollection(ColumnCollection[str, _NAMEDCOL]):
             )
 
         if key in self._index:
-
             existing = self._index[key][1]
 
             if existing is named_column:

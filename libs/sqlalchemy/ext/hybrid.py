@@ -876,7 +876,6 @@ _T_con = TypeVar("_T_con", bound=Any, contravariant=True)
 
 
 class HybridExtensionType(InspectionAttrExtensionType):
-
     HYBRID_METHOD = "HYBRID_METHOD"
     """Symbol indicating an :class:`InspectionAttr` that's
     of type :class:`.hybrid_method`.
@@ -924,13 +923,13 @@ class _HybridUpdaterType(Protocol[_T_con]):
 
 
 class _HybridDeleterType(Protocol[_T_co]):
-    def __call__(self, instance: Any) -> None:
+    def __call__(s, self: Any) -> None:
         ...
 
 
 class _HybridExprCallableType(Protocol[_T]):
     def __call__(
-        self, cls: Any
+        s, cls: Any
     ) -> Union[_HasClauseElement, SQLColumnExpression[_T]]:
         ...
 
@@ -1412,7 +1411,6 @@ class hybrid_property(interfaces.InspectionAttrInfo, ORMDescriptor[_T]):
     def _get_comparator(
         self, comparator: Any
     ) -> Callable[[Any], _HybridClassLevelAccessor[_T]]:
-
         proxy_attr = attributes.create_proxied_attribute(self)
 
         def expr_comparator(

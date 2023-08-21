@@ -229,7 +229,6 @@ class Inspector(inspection.Inspectable["Inspector"]):
     def _construct(
         cls, init: Callable[..., Any], bind: Union[Engine, Connection]
     ) -> Inspector:
-
         if hasattr(bind.dialect, "inspector"):
             cls = bind.dialect.inspector  # type: ignore[attr-defined]
 
@@ -1625,7 +1624,6 @@ class Inspector(inspection.Inspectable["Inspector"]):
         exclude_columns: Collection[str],
         cols_by_orig_name: Dict[str, sa_schema.Column[Any]],
     ) -> None:
-
         orig_name = col_d["name"]
 
         table.metadata.dispatch.column_reflect(self, table, col_d)
@@ -1895,6 +1893,7 @@ class Inspector(inspection.Inspectable["Inspector"]):
             columns = const_d["column_names"]
             comment = const_d.get("comment")
             duplicates = const_d.get("duplicates_index")
+            dialect_options = const_d.get("dialect_options", {})
             if include_columns and not set(columns).issubset(include_columns):
                 continue
             if duplicates:
@@ -1918,7 +1917,10 @@ class Inspector(inspection.Inspectable["Inspector"]):
                     constrained_cols.append(constrained_col)
             table.append_constraint(
                 sa_schema.UniqueConstraint(
-                    *constrained_cols, name=conname, comment=comment
+                    *constrained_cols,
+                    name=conname,
+                    comment=comment,
+                    **dialect_options,
                 )
             )
 

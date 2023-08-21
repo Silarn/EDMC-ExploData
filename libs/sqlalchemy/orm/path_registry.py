@@ -449,6 +449,7 @@ class TokenRegistry(PathRegistry):
     is_token = True
 
     def generate_for_superclasses(self) -> Iterator[PathRegistry]:
+        # NOTE: this method is no longer used.  consider removal
         parent = self.parent
         if is_root(parent):
             yield self
@@ -473,6 +474,35 @@ class TokenRegistry(PathRegistry):
                 yield TokenRegistry(parent.parent[ent], self.token)
         else:
             yield self
+
+    def _generate_natural_for_superclasses(
+        self,
+    ) -> Iterator[_PathRepresentation]:
+        parent = self.parent
+        if is_root(parent):
+            yield self.natural_path
+            return
+
+        if TYPE_CHECKING:
+            assert isinstance(parent, AbstractEntityRegistry)
+        for mp_ent in parent.mapper.iterate_to_root():
+            yield TokenRegistry(parent.parent[mp_ent], self.token).natural_path
+        if (
+            parent.is_aliased_class
+            and cast(
+                "AliasedInsp[Any]",
+                parent.entity,
+            )._is_with_polymorphic
+        ):
+            yield self.natural_path
+            for ent in cast(
+                "AliasedInsp[Any]", parent.entity
+            )._with_polymorphic_entities:
+                yield (
+                    TokenRegistry(parent.parent[ent], self.token).natural_path
+                )
+        else:
+            yield self.natural_path
 
     def _getitem(self, entity: Any) -> Any:
         try:
@@ -514,10 +544,9 @@ class PropRegistry(PathRegistry):
         natural_parent: AbstractEntityRegistry = parent
 
         # inherit "is_unnatural" from the parent
-        if parent.parent.is_unnatural:
-            self.is_unnatural = True
-        else:
-            self.is_unnatural = False
+        self.is_unnatural = parent.parent.is_unnatural or bool(
+            parent.mapper.inherits
+        )
 
         if not insp.is_aliased_class or insp._use_mapper_path:  # type: ignore
             parent = natural_parent = parent.parent[prop.parent]
@@ -590,7 +619,7 @@ class PropRegistry(PathRegistry):
 
         self._wildcard_path_loader_key = (
             "loader",
-            parent.path + self.prop._wildcard_token,  # type: ignore
+            parent.natural_path + self.prop._wildcard_token,  # type: ignore
         )
         self._default_path_loader_key = self.prop._default_path_loader_key
         self._loader_key = ("loader", self.natural_path)
@@ -665,10 +694,13 @@ class AbstractEntityRegistry(CreatesToken):
         # are to avoid the more expensive conditional logic that follows if we
         # know we don't have to do it.   This conditional can just as well be
         # "if parent.path:", it just is more function calls.
+        #
+        # This is basically the only place that the "is_unnatural" flag
+        # actually changes behavior.
         if parent.path and (self.is_aliased_class or parent.is_unnatural):
             # this is an infrequent code path used only for loader strategies
             # that also make use of of_type().
-            if entity.mapper.isa(parent.natural_path[-1].entity):  # type: ignore # noqa: E501
+            if entity.mapper.isa(parent.natural_path[-1].mapper):  # type: ignore # noqa: E501
                 self.natural_path = parent.natural_path + (entity.mapper,)
             else:
                 self.natural_path = parent.natural_path + (

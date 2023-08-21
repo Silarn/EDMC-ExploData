@@ -931,7 +931,10 @@ class _AbstractLoad(traversals.GenerativeOnTraversal, LoaderOption):
             zip(to_chop, path.natural_path)
         ):
             if isinstance(c_token, str):
-                if i == 0 and c_token.endswith(f":{_DEFAULT_TOKEN}"):
+                if i == 0 and (
+                    c_token.endswith(f":{_DEFAULT_TOKEN}")
+                    or c_token.endswith(f":{_WILDCARD_TOKEN}")
+                ):
                     return to_chop
                 elif (
                     c_token != f"{_RELATIONSHIP_TOKEN}:{_WILDCARD_TOKEN}"
@@ -1089,7 +1092,6 @@ class Load(_AbstractLoad):
         mapper_entities: Sequence[_MapperEntity],
         raiseerr: bool,
     ) -> None:
-
         reconciled_lead_entity = self._reconcile_query_entities_with_us(
             mapper_entities, raiseerr
         )
@@ -1947,7 +1949,6 @@ class _AttributeStrategyLoad(_LoadElement):
             )
         start_path = self._path_with_polymorphic_path
         if current_path:
-
             new_path = self._adjust_effective_path_for_current_path(
                 start_path, current_path
             )
@@ -2128,10 +2129,12 @@ class _TokenStrategyLoad(_LoadElement):
         # is set.
 
         return [
-            ("loader", _path.natural_path)
-            for _path in cast(
-                TokenRegistry, effective_path
-            ).generate_for_superclasses()
+            ("loader", natural_path)
+            for natural_path in (
+                cast(
+                    TokenRegistry, effective_path
+                )._generate_natural_for_superclasses()
+            )
         ]
 
 

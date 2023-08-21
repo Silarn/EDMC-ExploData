@@ -51,6 +51,7 @@ from .base import Mapped
 from .base import object_mapper as object_mapper
 from .base import object_state as object_state  # noqa: F401
 from .base import opt_manager_of_class
+from .base import ORMDescriptor
 from .base import state_attribute_str as state_attribute_str  # noqa: F401
 from .base import state_class_str as state_class_str  # noqa: F401
 from .base import state_str as state_str  # noqa: F401
@@ -113,10 +114,8 @@ if typing.TYPE_CHECKING:
     from ..sql.base import ReadOnlyColumnCollection
     from ..sql.elements import BindParameter
     from ..sql.selectable import _ColumnsClauseElement
-    from ..sql.selectable import Alias
     from ..sql.selectable import Select
     from ..sql.selectable import Selectable
-    from ..sql.selectable import Subquery
     from ..sql.visitors import anon_map
     from ..util.typing import _AnnotationScanType
     from ..util.typing import ArgsTypeProcotol
@@ -935,7 +934,7 @@ class AliasedInsp(
     _weak_entity: weakref.ref[AliasedClass[_O]]
     """the AliasedClass that refers to this AliasedInsp"""
 
-    _target: Union[_O, AliasedClass[_O]]
+    _target: Union[Type[_O], AliasedClass[_O]]
     """the thing referred towards by the AliasedClass/AliasedInsp.
 
     In the vast majority of cases, this is the mapped class.  However
@@ -957,7 +956,6 @@ class AliasedInsp(
         represents_outer_join: bool,
         nest_adapters: bool,
     ):
-
         mapped_class_or_ac = inspected.entity
         mapper = inspected.mapper
 
@@ -1024,12 +1022,11 @@ class AliasedInsp(
     def _alias_factory(
         cls,
         element: Union[_EntityType[_O], FromClause],
-        alias: Optional[Union[Alias, Subquery]] = None,
+        alias: Optional[FromClause] = None,
         name: Optional[str] = None,
         flat: bool = False,
         adapt_on_names: bool = False,
     ) -> Union[AliasedClass[_O], FromClause]:
-
         if isinstance(element, FromClause):
             if adapt_on_names:
                 raise sa_exc.ArgumentError(
@@ -1063,7 +1060,6 @@ class AliasedInsp(
         adapt_on_names: bool = False,
         _use_mapper_path: bool = False,
     ) -> AliasedClass[_O]:
-
         primary_mapper = _class_to_mapper(base)
 
         if selectable not in (None, False) and flat:
@@ -1440,7 +1436,6 @@ class LoaderCriteriaOption(CriteriaOption):
         )
 
     def _all_mappers(self) -> Iterator[Mapper[Any]]:
-
         if self.entity:
             yield from self.entity.mapper.self_and_descendants
         else:
@@ -1516,14 +1511,12 @@ inspection._inspects(AliasedClass)(lambda target: target._aliased_insp)
 def _inspect_mc(
     class_: Type[_O],
 ) -> Optional[Mapper[_O]]:
-
     try:
         class_manager = opt_manager_of_class(class_)
         if class_manager is None or not class_manager.is_mapped:
             return None
         mapper = class_manager.mapper
     except exc.NO_STATE:
-
         return None
     else:
         return mapper
@@ -1536,7 +1529,6 @@ GenericAlias = type(List[Any])
 def _inspect_generic_alias(
     class_: Type[_O],
 ) -> Optional[Mapper[_O]]:
-
     origin = cast("Type[_O]", typing_get_origin(class_))
     return _inspect_mc(origin)
 
@@ -2316,7 +2308,6 @@ def _extract_mapped_subtype(
     """
 
     if raw_annotation is None:
-
         if required:
             raise sa_exc.ArgumentError(
                 f"Python typing annotation is required for attribute "
@@ -2354,12 +2345,19 @@ def _extract_mapped_subtype(
         if not hasattr(annotated, "__origin__") or not is_origin_of_cls(
             annotated, _MappedAnnotationBase
         ):
-
             if expect_mapped:
-                if getattr(annotated, "__origin__", None) is typing.ClassVar:
+                if not raiseerr:
                     return None
 
-                if not raiseerr:
+                origin = getattr(annotated, "__origin__", None)
+                if origin is typing.ClassVar:
+                    return None
+
+                # check for other kind of ORM descriptor like AssociationProxy,
+                # don't raise for that (issue #9957)
+                elif isinstance(origin, type) and issubclass(
+                    origin, ORMDescriptor
+                ):
                     return None
 
                 raise sa_exc.ArgumentError(

@@ -24,6 +24,7 @@ from typing import Callable
 from typing import cast
 from typing import ClassVar
 from typing import Dict
+from typing import Iterable
 from typing import List
 from typing import NamedTuple
 from typing import Optional
@@ -44,6 +45,7 @@ from .base import ATTR_EMPTY
 from .base import ATTR_WAS_SET
 from .base import CALLABLES_OK
 from .base import DEFERRED_HISTORY_LOAD
+from .base import INCLUDE_PENDING_MUTATIONS  # noqa
 from .base import INIT_OK
 from .base import instance_dict as instance_dict
 from .base import instance_state as instance_state
@@ -447,12 +449,12 @@ class QueryableAttribute(
     def operate(
         self, op: OperatorType, *other: Any, **kwargs: Any
     ) -> ColumnElement[Any]:
-        return op(self.comparator, *other, **kwargs)  # type: ignore[return-value]  # noqa: E501
+        return op(self.comparator, *other, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
 
     def reverse_operate(
         self, op: OperatorType, other: Any, **kwargs: Any
     ) -> ColumnElement[Any]:
-        return op(other, self.comparator, **kwargs)  # type: ignore[return-value]  # noqa: E501
+        return op(other, self.comparator, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
 
     def hasparent(
         self, state: InstanceState[Any], optimistic: bool = False
@@ -990,7 +992,6 @@ class AttributeImpl:
                     last_parent is not False
                     and last_parent.key != parent_state.key
                 ):
-
                     if last_parent.obj() is None:
                         raise orm_exc.StaleDataError(
                             "Removing state %s from parent "
@@ -1370,7 +1371,6 @@ class ScalarObjectAttributeImpl(ScalarAttributeImpl):
         else:
             original = state.committed_state.get(self.key, _NO_HISTORY)
             if original is PASSIVE_NO_RESULT:
-
                 loader_passive = passive | (
                     PASSIVE_ONLY_PERSISTENT
                     | NO_AUTOFLUSH
@@ -1418,7 +1418,6 @@ class ScalarObjectAttributeImpl(ScalarAttributeImpl):
                 and original is not NO_VALUE
                 and original is not current
             ):
-
                 ret.append((instance_state(original), original))
         return ret
 
@@ -1681,9 +1680,22 @@ class CollectionAttributeImpl(HasCollectionAdapter, AttributeImpl):
         passive: PassiveFlag = PASSIVE_OFF,
     ) -> History:
         current = self.get(state, dict_, passive=passive)
+
         if current is PASSIVE_NO_RESULT:
-            return HISTORY_BLANK
+            if (
+                passive & PassiveFlag.INCLUDE_PENDING_MUTATIONS
+                and self.key in state._pending_mutations
+            ):
+                pending = state._pending_mutations[self.key]
+                return pending.merge_with_history(HISTORY_BLANK)
+            else:
+                return HISTORY_BLANK
         else:
+            if passive & PassiveFlag.INCLUDE_PENDING_MUTATIONS:
+                # this collection is loaded / present.  should not be any
+                # pending mutations
+                assert self.key not in state._pending_mutations
+
             return History.from_collection(self, state, current)
 
     def get_all_pending(
@@ -1828,7 +1840,6 @@ class CollectionAttributeImpl(HasCollectionAdapter, AttributeImpl):
     def _initialize_collection(
         self, state: InstanceState[Any]
     ) -> Tuple[CollectionAdapter, _AdaptedCollectionProtocol]:
-
         adapter, collection = state.manager.initialize_collection(
             self.key, state, self.collection_factory
         )
@@ -2255,7 +2266,6 @@ def backref_listeners(
                 initiator is not check_remove_token
                 and initiator is not check_replace_token
             ):
-
                 if not check_for_dupes_on_remove or not util.has_dupes(
                     # when this event is called, the item is usually
                     # present in the list, except for a pop() operation.
@@ -2364,6 +2374,13 @@ class History(NamedTuple):
         """Return True if this :class:`.History` has changes."""
 
         return bool(self.added or self.deleted)
+
+    def _merge(self, added: Iterable[Any], deleted: Iterable[Any]) -> History:
+        return History(
+            list(self.added) + list(added),
+            self.unchanged,
+            list(self.deleted) + list(deleted),
+        )
 
     def as_state(self) -> History:
         return History(
@@ -2478,7 +2495,6 @@ class History(NamedTuple):
         elif original is _NO_HISTORY:
             return cls((), list(current), ())
         else:
-
             current_states = [
                 ((c is not None) and instance_state(c) or None, c)
                 for c in current
@@ -2582,7 +2598,6 @@ def register_attribute_impl(
     backref: Optional[str] = None,
     **kw: Any,
 ) -> QueryableAttribute[Any]:
-
     manager = manager_of_class(class_)
     if uselist:
         factory = kw.pop("typecallable", None)

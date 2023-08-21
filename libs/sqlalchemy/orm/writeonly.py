@@ -248,7 +248,6 @@ class WriteOnlyAttributeImpl(
             fn(state, value, initiator or self._remove_token)
 
     def _modified_event(self, state, dict_):
-
         if self.key not in state.committed_state:
             state.committed_state[self.key] = self.collection_history_cls(
                 self, state, PassiveFlag.PASSIVE_NO_FETCH
@@ -256,7 +255,7 @@ class WriteOnlyAttributeImpl(
 
         state._modified_event(dict_, self, attributes.NEVER_SET)
 
-        # this is a hack to allow the fixtures.ComparableEntity fixture
+        # this is a hack to allow the entities.ComparableEntity fixture
         # to work
         dict_[self.key] = True
         return state.committed_state[self.key]
@@ -445,7 +444,6 @@ class AbstractCollectionWriter(Generic[_T]):
         __slots__ = ()
 
     def __init__(self, attr, state):
-
         self.instance = instance = state.obj()
         self.attr = attr
 

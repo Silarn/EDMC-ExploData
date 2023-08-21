@@ -151,6 +151,8 @@ class PassiveFlag(FastIntFlag):
     DEFERRED_HISTORY_LOAD = 256
     """indicates special load of the previous value of an attribute"""
 
+    INCLUDE_PENDING_MUTATIONS = 512
+
     # pre-packaged sets of flags used as inputs
     PASSIVE_OFF = (
         RELATED_OBJECT_OK | NON_PERSISTENT_OK | INIT_OK | CALLABLES_OK | SQL_OK
@@ -191,6 +193,7 @@ class PassiveFlag(FastIntFlag):
     NO_AUTOFLUSH,
     NO_RAISE,
     DEFERRED_HISTORY_LOAD,
+    INCLUDE_PENDING_MUTATIONS,
     PASSIVE_OFF,
     PASSIVE_RETURN_NO_VALUE,
     PASSIVE_NO_INITIALIZE,
@@ -912,9 +915,19 @@ class DynamicMapped(_MappedAnnotationBase[_T]):
 
     if TYPE_CHECKING:
 
+        @overload
+        def __get__(
+            self, instance: None, owner: Any
+        ) -> InstrumentedAttribute[_T]:
+            ...
+
+        @overload
+        def __get__(self, instance: object, owner: Any) -> AppenderQuery[_T]:
+            ...
+
         def __get__(
             self, instance: Optional[object], owner: Any
-        ) -> AppenderQuery[_T]:
+        ) -> Union[InstrumentedAttribute[_T], AppenderQuery[_T]]:
             ...
 
         def __set__(self, instance: Any, value: typing.Collection[_T]) -> None:
@@ -954,9 +967,21 @@ class WriteOnlyMapped(_MappedAnnotationBase[_T]):
 
     if TYPE_CHECKING:
 
+        @overload
+        def __get__(
+            self, instance: None, owner: Any
+        ) -> InstrumentedAttribute[_T]:
+            ...
+
+        @overload
+        def __get__(
+            self, instance: object, owner: Any
+        ) -> WriteOnlyCollection[_T]:
+            ...
+
         def __get__(
             self, instance: Optional[object], owner: Any
-        ) -> WriteOnlyCollection[_T]:
+        ) -> Union[InstrumentedAttribute[_T], WriteOnlyCollection[_T]]:
             ...
 
         def __set__(self, instance: Any, value: typing.Collection[_T]) -> None:

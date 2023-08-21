@@ -43,12 +43,14 @@ from typing import Dict
 from typing import Iterable
 from typing import Iterator
 from typing import List
+from typing import Mapping
 from typing import NoReturn
 from typing import Optional
 from typing import overload
 from typing import Sequence as _typing_Sequence
 from typing import Set
 from typing import Tuple
+from typing import Type
 from typing import TYPE_CHECKING
 from typing import TypeVar
 from typing import Union
@@ -85,6 +87,7 @@ from ..util.typing import Final
 from ..util.typing import Literal
 from ..util.typing import Protocol
 from ..util.typing import Self
+from ..util.typing import TypedDict
 from ..util.typing import TypeGuard
 
 if typing.TYPE_CHECKING:
@@ -124,7 +127,6 @@ _ServerDefaultArgument = Union[
 
 
 class SchemaConst(Enum):
-
     RETAIN_SCHEMA = 1
     """Symbol indicating that a :class:`_schema.Table`, :class:`.Sequence`
     or in some cases a :class:`_schema.ForeignKey` object, in situations
@@ -1058,7 +1060,6 @@ class Table(
         if the_sentinel:
             the_sentinel_zero = the_sentinel[0]
             if the_sentinel_zero.identity:
-
                 if the_sentinel_zero.identity._increment_is_negative:
                     if sentinel_is_explicit:
                         raise exc.InvalidRequestError(
@@ -1095,7 +1096,6 @@ class Table(
                         _SentinelDefaultCharacterization.SENTINEL_DEFAULT
                     )
                 elif default_is_sequence(the_sentinel_zero.default):
-
                     if the_sentinel_zero.default._increment_is_negative:
                         if sentinel_is_explicit:
                             raise exc.InvalidRequestError(
@@ -2126,7 +2126,7 @@ class Column(DialectKWArgs, SchemaItem, ColumnClause[_T]):
             self.onupdate = onupdate
             l_args.append(onupdate)
         else:
-            self.onpudate = None
+            self.onupdate = None
 
         if server_default is not None:
             if isinstance(server_default, FetchedValue):
@@ -3166,7 +3166,6 @@ class ForeignKey(DialectKWArgs, SchemaItem):
         _column: Column[Any]
 
         if isinstance(self._colspec, str):
-
             parenttable, tablekey, colname = self._resolve_col_tokens()
 
             if self._unresolvable or tablekey not in parenttable.metadata:
@@ -5287,8 +5286,35 @@ class Index(
         )
 
 
-DEFAULT_NAMING_CONVENTION: util.immutabledict[str, str] = util.immutabledict(
-    {"ix": "ix_%(column_0_label)s"}
+_AllConstraints = Union[
+    Index,
+    UniqueConstraint,
+    CheckConstraint,
+    ForeignKeyConstraint,
+    PrimaryKeyConstraint,
+]
+
+_NamingSchemaCallable = Callable[[_AllConstraints, Table], str]
+
+
+class _NamingSchemaTD(TypedDict, total=False):
+    fk: Union[str, _NamingSchemaCallable]
+    pk: Union[str, _NamingSchemaCallable]
+    ix: Union[str, _NamingSchemaCallable]
+    ck: Union[str, _NamingSchemaCallable]
+    uq: Union[str, _NamingSchemaCallable]
+
+
+_NamingSchemaParameter = Union[
+    _NamingSchemaTD,
+    Mapping[
+        Union[Type[_AllConstraints], str], Union[str, _NamingSchemaCallable]
+    ],
+]
+
+
+DEFAULT_NAMING_CONVENTION: _NamingSchemaParameter = util.immutabledict(
+    {"ix": "ix_%(column_0_label)s"}  # type: ignore[arg-type]
 )
 
 
@@ -5323,7 +5349,7 @@ class MetaData(HasSchemaAttr):
         self,
         schema: Optional[str] = None,
         quote_schema: Optional[bool] = None,
-        naming_convention: Optional[Dict[str, str]] = None,
+        naming_convention: Optional[_NamingSchemaParameter] = None,
         info: Optional[_InfoType] = None,
     ) -> None:
         """Create a new MetaData object.
