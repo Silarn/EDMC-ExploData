@@ -4,6 +4,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Aleoids_Genus_Name;': {
         'name': 'Aleoida',
         'distance': 150,
+        'multiple': False,
         'colors': {
             'star': {
                 'B': 'Yellow',
@@ -24,6 +25,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Bacterial_Genus_Name;': {
         'name': 'Bacterium',
         'distance': 500,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Bacterial_01_Name;': {
@@ -189,6 +191,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Cactoid_Genus_Name;': {
         'name': 'Cactoida',
         'distance': 300,
+        'multiple': False,
         'colors': {
             'star': {
                 'O': 'Grey',
@@ -209,6 +212,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Clypeus_Genus_Name;': {
         'name': 'Clypeus',
         'distance': 150,
+        'multiple': False,
         'colors': {
             'star': {
                 'B': 'Maroon',
@@ -227,6 +231,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Conchas_Genus_Name;': {
         'name': 'Concha',
         'distance': 150,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Conchas_01_Name;': {
@@ -280,10 +285,11 @@ data: Mapping[str, Mapping[str, any]] = {
             }
         }
     },
-    '$Codex_Ent_Cone_Name;': {'name': 'Bark Mound', 'distance': 100},
+    '$Codex_Ent_Cone_Name;': {'name': 'Bark Mound', 'distance': 100, 'multiple': False},
     '$Codex_Ent_Electricae_Genus_Name;': {
         'name': 'Electricae',
         'distance': 1000,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Electricae_01_Name;': {
@@ -312,6 +318,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Fonticulus_Genus_Name;': {
         'name': 'Fonticulua',
         'distance': 500,
+        'multiple': False,
         'colors': {
             'star': {
                 'O': 'Grey',
@@ -335,6 +342,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Fumerolas_Genus_Name;': {
         'name': 'Fumerola',
         'distance': 100,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Fumerolas_01_Name;': {
@@ -383,6 +391,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Fungoids_Genus_Name;': {
         'name': 'Fungoida',
         'distance': 300,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Fungoids_01_Name;': {
@@ -428,10 +437,11 @@ data: Mapping[str, Mapping[str, any]] = {
             }
         }
     },
-    '$Codex_Ent_Ground_Struct_Ice_Name;': {'name': 'Crystalline Shards', 'distance': 100},
+    '$Codex_Ent_Ground_Struct_Ice_Name;': {'name': 'Crystalline Shards', 'distance': 100, 'multiple': False},
     '$Codex_Ent_Osseus_Genus_Name;': {
         'name': 'Osseus',
         'distance': 800,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Osseus_01_Name;': {
@@ -508,6 +518,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Recepta_Genus_Name;': {
         'name': 'Recepta',
         'distance': 150,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Recepta_01_Name;': {
@@ -548,10 +559,11 @@ data: Mapping[str, Mapping[str, any]] = {
             }
         }
     },
-    '$Codex_Ent_Brancae_Name;': {'name': 'Brain Tree', 'distance': 100},
+    '$Codex_Ent_Brancae_Name;': {'name': 'Brain Tree', 'distance': 100, 'multiple': True},
     '$Codex_Ent_Shrubs_Genus_Name;': {
         'name': 'Frutexa',
         'distance': 150,
+        'multiple': False,
         'colors': {
             'star': {
                 'O': 'Yellow',
@@ -567,10 +579,11 @@ data: Mapping[str, Mapping[str, any]] = {
             }
         }
     },
-    '$Codex_Ent_Sphere_Name;': {'name': 'Anemone', 'distance': 100},
+    '$Codex_Ent_Sphere_Name;': {'name': 'Anemone', 'distance': 100, 'multiple': False},
     '$Codex_Ent_Stratum_Genus_Name;': {
         'name': 'Stratum',
         'distance': 500,
+        'multiple': False,
         'colors': {
             'species': {
                 '$Codex_Ent_Stratum_01_Name;': {
@@ -685,16 +698,18 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Stratum_04_Name;': {  # Aranaemus breaks typical naming convention
         'name': 'Stratum',
         'distance': 500,
+        'multiple': False,
         'colors': {
             'star': {
                 'F': 'Emerald'
             }
         }
     },
-    '$Codex_Ent_Tube_Name;': {'name': 'Sinuous Tubers', 'distance': 100},
+    '$Codex_Ent_Tube_Name;': {'name': 'Sinuous Tubers', 'distance': 100, 'multiple': True},
     '$Codex_Ent_Tubus_Genus_Name;': {
         'name': 'Tubus',
         'distance': 800,
+        'multiple': False,
         'colors': {
             'star': {
                 'O': 'Green',
@@ -716,6 +731,7 @@ data: Mapping[str, Mapping[str, any]] = {
     '$Codex_Ent_Tussocks_Genus_Name;': {
         'name': 'Tussock',
         'distance': 200,
+        'multiple': False,
         'colors': {
             'star': {
                 'F': 'Yellow',
@@ -731,5 +747,5 @@ data: Mapping[str, Mapping[str, any]] = {
             }
         }
     },
-    '$Codex_Ent_Vents_Name;': {'name': 'Amphora Plant', 'distance': 100},
+    '$Codex_Ent_Vents_Name;': {'name': 'Amphora Plant', 'distance': 100, 'multiple': False},
 }

@@ -222,7 +222,7 @@ class PlanetFlora(Base):
     scans: Mapped[list['FloraScans']] = relationship(backref='scan', passive_deletes=True)
     waypoints: Mapped[list['Waypoint']] = relationship(backref='waypoint', passive_deletes=True)
 
-    __table_args__ = (UniqueConstraint('planet_id', 'genus', name='_planet_genus_constraint'),
+    __table_args__ = (UniqueConstraint('planet_id', 'genus', 'species', name='_planet_genus_species_constraint'),
                       )
 
 

@@ -180,29 +180,40 @@ class PlanetData:
         self.commit()
         return self
 
-    def get_flora(self, genus: str = None, create: bool = False) -> list[PlanetFlora] | PlanetFlora | None:
+    def get_flora(self, genus: str = None, species: str = None, create: bool = False) -> list[PlanetFlora] | None:
         if genus:
+            flora_list: list[PlanetFlora] = []
             for flora in self._data.floras:  # type: PlanetFlora
                 if flora.genus == genus:
-                    return flora
-            else:
+                    if flora.species == '':
+                        return [flora]
+                    if species and species != '':
+                        if flora.species == species:
+                            return [flora]
+                    else:
+                        flora_list.append(flora)
+            if not len(flora_list):
                 if create:
                     new_flora = PlanetFlora(genus=genus)
+                    if species:
+                        new_flora.species = species
                     self._data.floras.append(new_flora)
                     self.commit()
-                    return new_flora
+                    return [new_flora]
                 return None
+            else:
+                return flora_list
         return self._data.floras
 
     def add_flora(self, genus: str, species: str = '', color: str = '') -> Self:
-        flora = self.get_flora(genus, create=True)
+        flora = self.get_flora(genus, species, create=True)[0]
         flora.species = species
         flora.color = color
         self.commit()
         return self
 
     def set_flora_species_scan(self, genus: str, species: str, scan: int, commander: int) -> Self:
-        flora = self.get_flora(genus, create=True)
+        flora = self.get_flora(genus, species, create=True)[0]
         flora.species = species
         stmt = select(FloraScans).where(FloraScans.flora_id == flora.id).where(FloraScans.commander_id == commander)
         scan_data: Optional[FloraScans] = self._session.scalar(stmt)
@@ -218,13 +229,13 @@ class PlanetData:
         return self
 
     def set_flora_color(self, genus: str, color: str) -> Self:
-        flora = self.get_flora(genus, create=True)
+        flora = self.get_flora(genus, create=True)[0]
         flora.color = color
         self.commit()
         return self
 
-    def add_flora_waypoint(self, genus: str, lat_long: tuple[float, float], commander: int, scan: bool = False) -> Self:
-        flora = self.get_flora(genus)
+    def add_flora_waypoint(self, genus: str, species: str, lat_long: tuple[float, float], commander: int, scan: bool = False) -> Self:
+        flora = self.get_flora(genus, species)[0]
         if flora:
             scans: FloraScans = self._session.scalar(
                 select(FloraScans).where(FloraScans.flora_id == flora.id).where(FloraScans.commander_id == commander)
