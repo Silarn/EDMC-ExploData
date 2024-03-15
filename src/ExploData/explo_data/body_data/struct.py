@@ -7,8 +7,8 @@ from typing import Self, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from ..db import Planet, System, PlanetFlora, PlanetGas, Waypoint, FloraScans, Star, PlanetStatus, \
-    StarStatus, NonBody, NonBodyStatus
+from ..db import Planet, System, PlanetFlora, PlanetGas, PlanetRing, PlanetStatus, Waypoint, FloraScans, Star, \
+    StarRing, StarStatus, NonBody, NonBodyStatus
 
 
 class PlanetData:
@@ -112,6 +112,22 @@ class PlanetData:
 
     def set_mass(self, value: float) -> Self:
         self._data.mass = value
+        self.commit()
+        return self
+
+    def get_rotation(self) -> Optional[float]:
+        return self._data.rotation
+
+    def set_rotation(self, value: float) -> Self:
+        self._data.rotation = value
+        self.commit()
+        return self
+
+    def get_orbital_period(self) -> Optional[float]:
+        return self._data.orbital_period
+
+    def set_orbital_period(self, value: float) -> Self:
+        self._data.orbital_period = value
         self.commit()
         return self
 
@@ -247,8 +263,30 @@ class PlanetData:
         self.commit()
         return self
 
+    def get_rings(self) -> list[PlanetRing] | None:
+        return self._data.rings
+
+    def add_ring(self, name: str, ring_type: str = '') -> Self:
+        for ring in self._data.rings:  # type: PlanetRing
+            if ring.name == name:
+                ring.type = ring_type
+                self.commit()
+                return self
+        new_ring = PlanetRing(name=name, type=ring_type)
+        self._data.rings.append(new_ring)
+        self.commit()
+        return self
+
     def clear_flora(self) -> Self:
         self._session.execute(delete(PlanetFlora).where(PlanetFlora.planet_id == self._data.id))
+        self.commit()
+        return self
+
+    def is_landable(self) -> bool:
+        return self._data.landable
+
+    def set_landable(self, value: bool) -> Self:
+        self._data.landable = value
         self.commit()
         return self
 
@@ -264,6 +302,17 @@ class PlanetData:
         if self._data.terraform_state and self._data.terraform_state in ['Terraformable', 'Terraforming', 'Terraformed']:
             return True
         return False
+
+    def get_scan_state(self, commander_id: int) -> int:
+        status = self.get_status(commander_id)
+        return status.scan_state
+
+    def set_scan_state(self, value: int, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        if value > status.scan_state:
+            status.scan_state = value
+        self.commit()
+        return self
 
     def is_discovered(self, commander_id: int) -> bool:
         status = self.get_status(commander_id)
@@ -483,6 +532,22 @@ class StarData:
         self.commit()
         return self
 
+    def get_rotation(self) -> Optional[float]:
+        return self._data.rotation
+
+    def set_rotation(self, value: float) -> Self:
+        self._data.rotation = value
+        self.commit()
+        return self
+
+    def get_orbital_period(self) -> Optional[float]:
+        return self._data.orbital_period
+
+    def set_orbital_period(self, value: float) -> Self:
+        self._data.orbital_period = value
+        self.commit()
+        return self
+
     def get_type(self) -> str:
         return self._data.type
 
@@ -504,6 +569,20 @@ class StarData:
 
     def set_luminosity(self, value: str) -> Self:
         self._data.luminosity = value
+        self.commit()
+        return self
+
+    def get_rings(self) -> list[StarRing] | None:
+        return self._data.rings
+
+    def add_ring(self, name: str, ring_type: str = '') -> Self:
+        for ring in self._data.rings:  # type: StarRing
+            if ring.name == name:
+                ring.type = ring_type
+                self.commit()
+                return self
+        new_ring = StarRing(name=name, type=ring_type)
+        self._data.rings.append(new_ring)
         self.commit()
         return self
 

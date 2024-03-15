@@ -8,7 +8,7 @@ from sqlite3 import OperationalError
 from typing import Optional
 
 import sqlalchemy.exc
-from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, \
+from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Boolean, \
     MetaData, Executable, Result, create_engine, event, DefaultClause
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
@@ -111,12 +111,27 @@ class Star(Base):
     name: Mapped[str]
     body_id: Mapped[int]
     statuses: Mapped[list['StarStatus']] = relationship(backref='status', passive_deletes=True)
+    rings: Mapped[list['StarRing']] = relationship(backref='ring', passive_deletes=True)
     distance: Mapped[Optional[float]]
     mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    rotation: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    orbital_period: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     type: Mapped[str] = mapped_column(default='', server_default='')
     subclass: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     luminosity: Mapped[str] = mapped_column(default='', server_default='')
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
+                      )
+
+
+class StarRing(Base):
+    __tablename__ = 'star_rings'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    star_id: Mapped[int] = mapped_column(ForeignKey('stars.id', ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(32))
+    type: Mapped[str] = mapped_column(String(64))
+
+    __table_args__ = (UniqueConstraint('star_id', 'name', name='_star_name_constraint'),
                       )
 
 
@@ -145,6 +160,8 @@ class Planet(Base):
     volcanism: Mapped[Optional[str]] = mapped_column(String(32))
     distance: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    rotation: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
+    orbital_period: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     gravity: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     temp: Mapped[Optional[float]]
     pressure: Mapped[Optional[float]]
@@ -152,11 +169,13 @@ class Planet(Base):
     parent_stars: Mapped[str] = mapped_column(default='', server_default='')
     bio_signals: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     materials: Mapped[str] = mapped_column(default='', server_default='')
+    landable: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     terraform_state: Mapped[str] = mapped_column(default='', server_default='')
 
     statuses: Mapped[list['PlanetStatus']] = relationship(backref='status', passive_deletes=True)
     gasses: Mapped[list['PlanetGas']] = relationship(backref='gas', passive_deletes=True)
     floras: Mapped[list['PlanetFlora']] = relationship(backref='flora', passive_deletes=True)
+    rings: Mapped[list['PlanetRing']] = relationship(backref='ring', passive_deletes=True)
 
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
                       )
@@ -173,6 +192,7 @@ class PlanetStatus(Base):
     mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     efficient: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    scan_state: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
                       )
 
@@ -203,6 +223,18 @@ class PlanetFlora(Base):
     waypoints: Mapped[list['Waypoint']] = relationship(backref='waypoint', passive_deletes=True)
 
     __table_args__ = (UniqueConstraint('planet_id', 'genus', name='_planet_genus_constraint'),
+                      )
+
+
+class PlanetRing(Base):
+    __tablename__ = 'planet_rings'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(32))
+    type: Mapped[str] = mapped_column(String(64))
+
+    __table_args__ = (UniqueConstraint('planet_id', 'name', name='_planet_name_constraint'),
                       )
 
 
@@ -379,11 +411,13 @@ def affix_schemas(engine: Engine) -> None:
     modify_table(engine, System)
     modify_table(engine, SystemStatus, [System, Commander])
     modify_table(engine, Star, [System])
+    modify_table(engine, StarRing, [Star])
     modify_table(engine, StarStatus, [Star, Commander])
     modify_table(engine, Planet, [System])
     modify_table(engine, PlanetStatus, [Planet, Commander])
     modify_table(engine, PlanetGas, [Planet])
     modify_table(engine, PlanetFlora, [Planet])
+    modify_table(engine, PlanetRing, [Planet])
     modify_table(engine, FloraScans, [PlanetFlora, Commander])
     modify_table(engine, Waypoint, [PlanetFlora, Commander])
     modify_table(engine, CodexScans, [Commander])
@@ -453,9 +487,16 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'planets', Column('mass', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'planets', Column('terraform_state', String(), nullable=False, server_default=''))
             if int(version['value']) < 4:
-                run_query(engine, 'DELETE FROM journal_log')
                 add_column(engine, 'planets', Column('pressure', Float(), nullable=True))
                 add_column(engine, 'planets', Column('radius', Float(), nullable=False, server_default=text('0.0')))
+            if int(version['value']) < 5:
+                run_query(engine, 'DELETE FROM journal_log')
+                add_column(engine, 'stars', Column('rotation', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'stars', Column('orbital_period', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'planets', Column('rotation', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'planets', Column('orbital_period', Float(), nullable=False, server_default=text('0.0')))
+                add_column(engine, 'planets', Column('landable', Boolean(), nullable=False, server_default=text('FALSE')))
+                add_column(engine, 'planet_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)

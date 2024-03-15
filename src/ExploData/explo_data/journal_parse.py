@@ -318,9 +318,15 @@ class JournalParse:
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
         star_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['StarType']) \
-            .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity'])
+            .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity']) \
+            .set_rotation(entry['RotationPeriod']).set_orbital_period(entry.get('OrbitalPeriod', 0))
         if self._cmdr:
             star_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id)
+
+        if 'Rings' in entry:
+            for ring in entry['Rings']:
+                ring_name = ring['Name'][len(entry['BodyName'])+1:]
+                star_data.add_ring(ring_name, ring['RingClass'])
 
     def add_planet(self, entry: Mapping[str, Any]) -> None:
         """
@@ -330,17 +336,19 @@ class JournalParse:
         """
 
         was_discovered = entry['ScanType'] == 'NavBeaconDetail' or entry['WasDiscovered']
+        scan_type = get_scan_type(entry['ScanType'])
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
             .set_mass(entry['MassEM']).set_gravity(entry['SurfaceGravity']) \
             .set_temp(entry.get('SurfaceTemperature', None)).set_pressure(entry.get('SurfacePressure', None)) \
             .set_radius(entry['Radius']).set_volcanism(entry.get('Volcanism', None)) \
-            .set_terraform_state(entry.get('TerraformState', ''))
+            .set_rotation(entry['RotationPeriod']).set_orbital_period(entry.get('OrbitalPeriod', 0)) \
+            .set_landable(entry.get('Landable', False)).set_terraform_state(entry.get('TerraformState', ''))
 
         if self._cmdr:
             body_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id) \
-                .set_was_mapped(entry['WasMapped'], self._cmdr.id)
+                .set_was_mapped(entry['WasMapped'], self._cmdr.id).set_scan_state(scan_type, self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
         if star_search:
@@ -359,6 +367,11 @@ class JournalParse:
         if 'AtmosphereComposition' in entry:
             for gas in entry['AtmosphereComposition']:
                 body_data.add_gas(gas['Name'], gas['Percent'])
+
+        if 'Rings' in entry:
+            for ring in entry['Rings']:
+                ring_name = ring['Name'][len(entry['BodyName'])+1:]
+                body_data.add_ring(ring_name, ring['RingClass'])
 
     def add_signals(self, entry: Mapping[str, Any]) -> None:
         """
@@ -417,7 +430,19 @@ class JournalParse:
             target_body.set_flora_color(entry['Genus'], color)
 
 
-def parse_journal(journal: Path, event: Event) -> bool:
+def get_scan_type(scan: str) -> int:
+    match scan:
+        case 'AutoScan':
+            return 1
+        case 'Detailed' | 'NavBeaconDetail':
+            return 3
+        case 'Basic':
+            return 2
+        case _:
+            return 0
+
+
+def parse_journal(journal: Path, event: Event) -> int:
     """
     Kickoff function for importing a journal file. Builds a new JournalParse object and begins parsing.
 
