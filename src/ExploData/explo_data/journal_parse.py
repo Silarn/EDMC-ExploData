@@ -48,7 +48,7 @@ class This:
         self.parsing_journals: bool = False
         self.journal_stop: bool = False
         self.journal_event: Optional[threading.Event] = None
-        self.journal_progress: float = 0.0
+        self.journal_progress: tuple[int, int] = (0, 0)
         self.journal_error: bool = False
 
         self.journal_processing_callbacks: dict[str, tk.Frame] = {}
@@ -69,7 +69,7 @@ class JournalParse:
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
 
-    def parse_journal(self, journal: Path, event: Event) -> bool:
+    def parse_journal(self, journal: Path, event: Event) -> int:
         """
         Function used to kick on a full journal import.
 
@@ -80,21 +80,24 @@ class JournalParse:
         if event.is_set():
             return True
         found = self._session.scalar(select(JournalLog).where(JournalLog.journal == journal.name))
+        failures = 0
         if not found:
             log: BinaryIO = open(journal, 'rb', 0)
             for line in log:
                 retry = 2
                 while True:
                     result = self.parse_entry(line)
-                    if (not result and retry == 0) or event.is_set():
-                        return False
+                    if not result:
+                        failures += 1
+                    if (failures >= 3 and retry == 0) or event.is_set():
+                        return 1
                     elif result:
                         break
                     retry -= 1
                     sleep(.1)
         else:
             self._session.expunge(found)
-            return True
+            return 2
 
         journal = JournalLog(journal=journal.name)
         try:
@@ -102,7 +105,7 @@ class JournalParse:
             self._session.commit()
         except (IntegrityError, AlcIntegrityError):
             self._session.expunge(journal)
-        return True
+        return 0
 
     def parse_entry(self, line: bytes) -> bool:
         """
@@ -505,7 +508,7 @@ def journal_worker() -> None:
 
     this.parsing_journals = True
     this.journal_error = False
-    this.journal_progress = 0.0
+    this.journal_progress = (0, 0)
     fire_start_event()
 
     try:
@@ -519,17 +522,20 @@ def journal_worker() -> None:
             with concurrent.futures.ThreadPoolExecutor(max_workers=min([cpu_count(), 4])) as executor:
                 future_journal: dict[Future, Path] = {executor.submit(parse_journal, journal, this.journal_event):
                                                       journal for journal in journal_files}
+                skipped = 0
                 for future in concurrent.futures.as_completed(future_journal):
                     count += 1
-                    this.journal_progress = count / len(journal_files)
                     fire_progress_event()
-                    if not future.result() or this.journal_stop:
+                    if future.result() == 1 or this.journal_stop:
                         if not this.journal_stop:
                             this.journal_error = True
                         this.parsing_journals = False
                         this.journal_event.set()
                         executor.shutdown(wait=True, cancel_futures=True)
                         break
+                    elif future.result() == 2:
+                        skipped += 1
+                    this.journal_progress = (count - skipped, len(journal_files) - skipped)
 
     except Exception as ex:
         logger.error('Journal parsing failed', exc_info=ex)
@@ -634,7 +640,7 @@ def has_error() -> bool:
     return this.journal_error
 
 
-def get_progress() -> float:
+def get_progress() -> tuple[int, int]:
     """
     Helper function to access local data about the journal import progress.
     """
