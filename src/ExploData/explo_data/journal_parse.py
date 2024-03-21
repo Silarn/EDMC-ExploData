@@ -227,9 +227,12 @@ class JournalParse:
 
                     target_body = PlanetData(self._system, planet, self._session)
 
-                    genus, species, color = parse_variant(entry['Name'])
-                    if genus is not '' and species is not '':
-                        target_body.add_flora(genus, species, color)
+                    if entry['SubCategory'] == '$Codex_SubCategory_Geology_and_Anomalies;':
+                        target_body.add_geo(entry['Name'])
+                    elif entry['SubCategory'] == '$Codex_SubCategory_Organic_Structures;':
+                        genus, species, color = parse_variant(entry['Name'])
+                        if genus is not '' and species is not '':
+                            target_body.add_flora(genus, species, color)
 
                     if self._cmdr:
                         set_codex(self._cmdr.id, entry['Name'], self._system.region)
@@ -394,6 +397,8 @@ class JournalParse:
         for signal in entry['Signals']:
             if signal['Type'] == '$SAA_SignalType_Biological;':
                 body_data.set_bio_signals(signal['Count'])
+            elif signal['Type'] == '$SAA_SignalType_Geological;':
+                body_data.set_geo_signals(signal['Count'])
 
         # If signals include genuses, add them to the body data
         if 'Genuses' in entry:

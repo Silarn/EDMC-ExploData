@@ -168,6 +168,7 @@ class Planet(Base):
     radius: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     parent_stars: Mapped[str] = mapped_column(default='', server_default='')
     bio_signals: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    geo_signals: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     materials: Mapped[str] = mapped_column(default='', server_default='')
     landable: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     terraform_state: Mapped[str] = mapped_column(default='', server_default='')
@@ -175,6 +176,7 @@ class Planet(Base):
     statuses: Mapped[list['PlanetStatus']] = relationship(backref='status', passive_deletes=True)
     gasses: Mapped[list['PlanetGas']] = relationship(backref='gas', passive_deletes=True)
     floras: Mapped[list['PlanetFlora']] = relationship(backref='flora', passive_deletes=True)
+    geos: Mapped[list['PlanetGeo']] = relationship(backref='geo', passive_deletes=True)
     rings: Mapped[list['PlanetRing']] = relationship(backref='ring', passive_deletes=True)
 
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
@@ -223,6 +225,17 @@ class PlanetFlora(Base):
     waypoints: Mapped[list['Waypoint']] = relationship(backref='waypoint', passive_deletes=True)
 
     __table_args__ = (UniqueConstraint('planet_id', 'genus', 'species', name='_planet_genus_species_constraint'),
+                      )
+
+
+class PlanetGeo(Base):
+    __tablename__ = 'planet_geos'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
+    type: Mapped[str]
+
+    __table_args__ = (UniqueConstraint('planet_id', 'type', name='_planet_type_constraint'),
                       )
 
 
@@ -417,6 +430,7 @@ def affix_schemas(engine: Engine) -> None:
     modify_table(engine, PlanetStatus, [Planet, Commander])
     modify_table(engine, PlanetGas, [Planet])
     modify_table(engine, PlanetFlora, [Planet])
+    modify_table(engine, PlanetGeo, [Planet])
     modify_table(engine, PlanetRing, [Planet])
     modify_table(engine, FloraScans, [PlanetFlora, Commander])
     modify_table(engine, Waypoint, [PlanetFlora, Commander])
@@ -490,13 +504,15 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'planets', Column('pressure', Float(), nullable=True))
                 add_column(engine, 'planets', Column('radius', Float(), nullable=False, server_default=text('0.0')))
             if int(version['value']) < 5:
-                run_query(engine, 'DELETE FROM journal_log')
                 add_column(engine, 'stars', Column('rotation', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'stars', Column('orbital_period', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'planets', Column('rotation', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'planets', Column('orbital_period', Float(), nullable=False, server_default=text('0.0')))
                 add_column(engine, 'planets', Column('landable', Boolean(), nullable=False, server_default=text('FALSE')))
                 add_column(engine, 'planet_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
+            if int(version['value']) < 6:
+                run_query(engine, 'DELETE FROM journal_log')
+                add_column(engine, 'planets', Column('geo_signals', Integer(), nullable=False, server_default=text('0')))
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)

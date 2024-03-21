@@ -7,8 +7,8 @@ from typing import Self, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from ..db import Planet, System, PlanetFlora, PlanetGas, PlanetRing, PlanetStatus, Waypoint, FloraScans, Star, \
-    StarRing, StarStatus, NonBody, NonBodyStatus
+from ..db import Planet, System, PlanetFlora, PlanetGeo, PlanetGas, PlanetRing, PlanetStatus, Waypoint, FloraScans, \
+    Star, StarRing, StarStatus, NonBody, NonBodyStatus
 
 
 class PlanetData:
@@ -163,6 +163,14 @@ class PlanetData:
         self.commit()
         return self
 
+    def get_geo_signals(self) -> int:
+        return self._data.geo_signals
+
+    def set_geo_signals(self, value: int) -> Self:
+        self._data.geo_signals = value
+        self.commit()
+        return self
+
     def get_parent_stars(self) -> list[str]:
         if self._data.parent_stars:
             return self._data.parent_stars.split(',')
@@ -261,6 +269,20 @@ class PlanetData:
             if self._session.scalars(stmt):
                 return True
         return False
+
+    def get_geo(self, geo_type: str) -> PlanetGeo | None:
+        for geo in self._data.geos:  # type: PlanetGeo
+            if geo.type == geo_type:
+                return geo
+        return None
+
+    def add_geo(self, geo_type: str) -> PlanetGeo:
+        geo = self.get_geo(geo_type)
+        if not geo:
+            geo = PlanetGeo(type=geo_type)
+            self._data.geos.append(geo)
+            self.commit()
+        return geo
 
     def get_materials(self) -> set[str]:
         if self._data.materials:
