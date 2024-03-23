@@ -1,5 +1,5 @@
 # testing/config.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -22,10 +22,15 @@ from typing import Tuple
 from typing import TypeVar
 from typing import Union
 
+from . import mock
+from . import requirements as _requirements
 from .util import fail
 from .. import util
 
-requirements = None
+# default requirements; this is replaced by plugin_base when pytest
+# is run
+requirements = _requirements.SuiteRequirements()
+
 db = None
 db_url = None
 db_opts = None
@@ -42,7 +47,42 @@ if typing.TYPE_CHECKING:
 
     _fixture_functions: FixtureFunctions
 else:
-    _fixture_functions = None  # installed by plugin_base
+
+    class _NullFixtureFunctions:
+        def _null_decorator(self):
+            def go(fn):
+                return fn
+
+            return go
+
+        def skip_test_exception(self, *arg, **kw):
+            return Exception()
+
+        @property
+        def add_to_marker(self):
+            return mock.Mock()
+
+        def mark_base_test_class(self):
+            return self._null_decorator()
+
+        def combinations(self, *arg_sets, **kw):
+            return self._null_decorator()
+
+        def param_ident(self, *parameters):
+            return self._null_decorator()
+
+        def fixture(self, *arg, **kw):
+            return self._null_decorator()
+
+        def get_current_test_name(self):
+            return None
+
+        def async_test(self, fn):
+            return fn
+
+    # default fixture functions; these are replaced by plugin_base when
+    # pytest runs
+    _fixture_functions = _NullFixtureFunctions()
 
 
 _FN = TypeVar("_FN", bound=Callable[..., Any])
@@ -121,10 +161,7 @@ def combinations(
     )
 
 
-def combinations_list(
-    arg_iterable: Iterable[Tuple[Any,]],
-    **kw,
-):
+def combinations_list(arg_iterable: Iterable[Tuple[Any, ...]], **kw):
     "As combination, but takes a single iterable"
     return combinations(*arg_iterable, **kw)
 
@@ -140,8 +177,7 @@ class Variation:
 
     if typing.TYPE_CHECKING:
 
-        def __getattr__(self, key: str) -> bool:
-            ...
+        def __getattr__(self, key: str) -> bool: ...
 
     @property
     def name(self):
@@ -232,9 +268,11 @@ def variation(argname_or_fn, cases=None):
     else:
         argname = argname_or_fn
     cases_plus_limitations = [
-        entry
-        if (isinstance(entry, tuple) and len(entry) == 2)
-        else (entry, None)
+        (
+            entry
+            if (isinstance(entry, tuple) and len(entry) == 2)
+            else (entry, None)
+        )
         for entry in cases
     ]
 
@@ -243,9 +281,11 @@ def variation(argname_or_fn, cases=None):
     )
     return combinations(
         *[
-            (variation._name, variation, limitation)
-            if limitation is not None
-            else (variation._name, variation)
+            (
+                (variation._name, variation, limitation)
+                if limitation is not None
+                else (variation._name, variation)
+            )
             for variation, (case, limitation) in zip(
                 variations, cases_plus_limitations
             )

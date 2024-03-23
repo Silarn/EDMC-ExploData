@@ -1,5 +1,5 @@
-# sqlalchemy/__init__.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# __init__.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -55,7 +55,7 @@ from .pool import Pool as Pool
 from .pool import PoolProxiedConnection as PoolProxiedConnection
 from .pool import PoolResetState as PoolResetState
 from .pool import QueuePool as QueuePool
-from .pool import SingletonThreadPool as SingleonThreadPool
+from .pool import SingletonThreadPool as SingletonThreadPool
 from .pool import StaticPool as StaticPool
 from .schema import BaseDDLElement as BaseDDLElement
 from .schema import BLANK_SCHEMA as BLANK_SCHEMA
@@ -269,13 +269,11 @@ from .types import Uuid as Uuid
 from .types import VARBINARY as VARBINARY
 from .types import VARCHAR as VARCHAR
 
-__version__ = "2.0.20"
+__version__ = "2.0.29"
 
 
 def __go(lcls: Any) -> None:
-    from . import util as _sa_util
-
-    _sa_util.preloaded.import_prefix("sqlalchemy")
+    _util.preloaded.import_prefix("sqlalchemy")
 
     from . import exc
 
@@ -283,3 +281,14 @@ def __go(lcls: Any) -> None:
 
 
 __go(locals())
+
+
+def __getattr__(name: str) -> Any:
+    if name == "SingleonThreadPool":
+        _util.warn_deprecated(
+            "SingleonThreadPool was a typo in the v2 series. "
+            "Please use the correct SingletonThreadPool name.",
+            "2.0.24",
+        )
+        return SingletonThreadPool
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

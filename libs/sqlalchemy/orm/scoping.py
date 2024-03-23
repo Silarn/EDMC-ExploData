@@ -1,5 +1,5 @@
 # orm/scoping.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -86,8 +86,7 @@ class QueryPropertyDescriptor(Protocol):
 
     """
 
-    def __get__(self, instance: Any, owner: Type[_T]) -> Query[_T]:
-        ...
+    def __get__(self, instance: Any, owner: Type[_T]) -> Query[_T]: ...
 
 
 _O = TypeVar("_O", bound=object)
@@ -108,6 +107,7 @@ __all__ = ["scoped_session"]
         "begin",
         "begin_nested",
         "close",
+        "reset",
         "commit",
         "connection",
         "delete",
@@ -118,6 +118,7 @@ __all__ = ["scoped_session"]
         "expunge_all",
         "flush",
         "get",
+        "get_one",
         "get_bind",
         "is_modified",
         "bulk_save_objects",
@@ -466,7 +467,8 @@ class scoped_session(Generic[_S]):
 
             :ref:`pysqlite_serializable` - special workarounds required
             with the SQLite driver in order for SAVEPOINT to work
-            correctly.
+            correctly. For asyncio use cases, see the section
+            :ref:`aiosqlite_serializable`.
 
 
         """  # noqa: E501
@@ -491,11 +493,16 @@ class scoped_session(Generic[_S]):
 
         .. tip::
 
-            The :meth:`_orm.Session.close` method **does not prevent the
-            Session from being used again**.   The :class:`_orm.Session` itself
-            does not actually have a distinct "closed" state; it merely means
+            In the default running mode the :meth:`_orm.Session.close`
+            method **does not prevent the Session from being used again**.
+            The :class:`_orm.Session` itself does not actually have a
+            distinct "closed" state; it merely means
             the :class:`_orm.Session` will release all database connections
             and ORM objects.
+
+            Setting the parameter :paramref:`_orm.Session.close_resets_only`
+            to ``False`` will instead make the ``close`` final, meaning that
+            any further action on the session will be forbidden.
 
         .. versionchanged:: 1.4  The :meth:`.Session.close` method does not
            immediately create a new :class:`.SessionTransaction` object;
@@ -505,12 +512,48 @@ class scoped_session(Generic[_S]):
         .. seealso::
 
             :ref:`session_closing` - detail on the semantics of
-            :meth:`_orm.Session.close`
+            :meth:`_orm.Session.close` and :meth:`_orm.Session.reset`.
+
+            :meth:`_orm.Session.reset` - a similar method that behaves like
+            ``close()`` with  the parameter
+            :paramref:`_orm.Session.close_resets_only` set to ``True``.
 
 
         """  # noqa: E501
 
         return self._proxied.close()
+
+    def reset(self) -> None:
+        r"""Close out the transactional resources and ORM objects used by this
+        :class:`_orm.Session`, resetting the session to its initial state.
+
+        .. container:: class_bases
+
+            Proxied for the :class:`_orm.Session` class on
+            behalf of the :class:`_orm.scoping.scoped_session` class.
+
+        This method provides for same "reset-only" behavior that the
+        :meth:`_orm.Session.close` method has provided historically, where the
+        state of the :class:`_orm.Session` is reset as though the object were
+        brand new, and ready to be used again.
+        This method may then be useful for :class:`_orm.Session` objects
+        which set :paramref:`_orm.Session.close_resets_only` to ``False``,
+        so that "reset only" behavior is still available.
+
+        .. versionadded:: 2.0.22
+
+        .. seealso::
+
+            :ref:`session_closing` - detail on the semantics of
+            :meth:`_orm.Session.close` and :meth:`_orm.Session.reset`.
+
+            :meth:`_orm.Session.close` - a similar method will additionally
+            prevent re-use of the Session when the parameter
+            :paramref:`_orm.Session.close_resets_only` is set to ``False``.
+
+        """  # noqa: E501
+
+        return self._proxied.reset()
 
     def commit(self) -> None:
         r"""Flush pending changes and commit the current transaction.
@@ -638,8 +681,7 @@ class scoped_session(Generic[_S]):
         bind_arguments: Optional[_BindArguments] = None,
         _parent_execute_state: Optional[Any] = None,
         _add_event: Optional[Any] = None,
-    ) -> Result[_T]:
-        ...
+    ) -> Result[_T]: ...
 
     @overload
     def execute(
@@ -651,8 +693,7 @@ class scoped_session(Generic[_S]):
         bind_arguments: Optional[_BindArguments] = None,
         _parent_execute_state: Optional[Any] = None,
         _add_event: Optional[Any] = None,
-    ) -> CursorResult[Any]:
-        ...
+    ) -> CursorResult[Any]: ...
 
     @overload
     def execute(
@@ -664,8 +705,7 @@ class scoped_session(Generic[_S]):
         bind_arguments: Optional[_BindArguments] = None,
         _parent_execute_state: Optional[Any] = None,
         _add_event: Optional[Any] = None,
-    ) -> Result[Any]:
-        ...
+    ) -> Result[Any]: ...
 
     def execute(
         self,
@@ -1018,6 +1058,56 @@ class scoped_session(Generic[_S]):
         """  # noqa: E501
 
         return self._proxied.get(
+            entity,
+            ident,
+            options=options,
+            populate_existing=populate_existing,
+            with_for_update=with_for_update,
+            identity_token=identity_token,
+            execution_options=execution_options,
+            bind_arguments=bind_arguments,
+        )
+
+    def get_one(
+        self,
+        entity: _EntityBindKey[_O],
+        ident: _PKIdentityArgument,
+        *,
+        options: Optional[Sequence[ORMOption]] = None,
+        populate_existing: bool = False,
+        with_for_update: ForUpdateParameter = None,
+        identity_token: Optional[Any] = None,
+        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
+        bind_arguments: Optional[_BindArguments] = None,
+    ) -> _O:
+        r"""Return exactly one instance based on the given primary key
+        identifier, or raise an exception if not found.
+
+        .. container:: class_bases
+
+            Proxied for the :class:`_orm.Session` class on
+            behalf of the :class:`_orm.scoping.scoped_session` class.
+
+        Raises ``sqlalchemy.orm.exc.NoResultFound`` if the query
+        selects no rows.
+
+        For a detailed documentation of the arguments see the
+        method :meth:`.Session.get`.
+
+        .. versionadded:: 2.0.22
+
+        :return: The object instance.
+
+        .. seealso::
+
+            :meth:`.Session.get` - equivalent method that instead
+              returns ``None`` if no row was found with the provided primary
+              key
+
+
+        """  # noqa: E501
+
+        return self._proxied.get_one(
             entity,
             ident,
             options=options,
@@ -1480,14 +1570,12 @@ class scoped_session(Generic[_S]):
         return self._proxied.merge(instance, load=load, options=options)
 
     @overload
-    def query(self, _entity: _EntityType[_O]) -> Query[_O]:
-        ...
+    def query(self, _entity: _EntityType[_O]) -> Query[_O]: ...
 
     @overload
     def query(
         self, _colexpr: TypedColumnsClauseRole[_T]
-    ) -> RowReturningQuery[Tuple[_T]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T]]: ...
 
     # START OVERLOADED FUNCTIONS self.query RowReturningQuery 2-8
 
@@ -1497,14 +1585,12 @@ class scoped_session(Generic[_S]):
     @overload
     def query(
         self, __ent0: _TCCA[_T0], __ent1: _TCCA[_T1]
-    ) -> RowReturningQuery[Tuple[_T0, _T1]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1]]: ...
 
     @overload
     def query(
         self, __ent0: _TCCA[_T0], __ent1: _TCCA[_T1], __ent2: _TCCA[_T2]
-    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2]]: ...
 
     @overload
     def query(
@@ -1513,8 +1599,7 @@ class scoped_session(Generic[_S]):
         __ent1: _TCCA[_T1],
         __ent2: _TCCA[_T2],
         __ent3: _TCCA[_T3],
-    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3]]: ...
 
     @overload
     def query(
@@ -1524,8 +1609,7 @@ class scoped_session(Generic[_S]):
         __ent2: _TCCA[_T2],
         __ent3: _TCCA[_T3],
         __ent4: _TCCA[_T4],
-    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4]]: ...
 
     @overload
     def query(
@@ -1536,8 +1620,7 @@ class scoped_session(Generic[_S]):
         __ent3: _TCCA[_T3],
         __ent4: _TCCA[_T4],
         __ent5: _TCCA[_T5],
-    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4, _T5]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4, _T5]]: ...
 
     @overload
     def query(
@@ -1549,8 +1632,7 @@ class scoped_session(Generic[_S]):
         __ent4: _TCCA[_T4],
         __ent5: _TCCA[_T5],
         __ent6: _TCCA[_T6],
-    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6]]: ...
 
     @overload
     def query(
@@ -1563,16 +1645,14 @@ class scoped_session(Generic[_S]):
         __ent5: _TCCA[_T5],
         __ent6: _TCCA[_T6],
         __ent7: _TCCA[_T7],
-    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6, _T7]]:
-        ...
+    ) -> RowReturningQuery[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6, _T7]]: ...
 
     # END OVERLOADED FUNCTIONS self.query
 
     @overload
     def query(
         self, *entities: _ColumnsClauseArgument[Any], **kwargs: Any
-    ) -> Query[Any]:
-        ...
+    ) -> Query[Any]: ...
 
     def query(
         self, *entities: _ColumnsClauseArgument[Any], **kwargs: Any
@@ -1724,8 +1804,7 @@ class scoped_session(Generic[_S]):
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: Optional[_BindArguments] = None,
         **kw: Any,
-    ) -> Optional[_T]:
-        ...
+    ) -> Optional[_T]: ...
 
     @overload
     def scalar(
@@ -1736,8 +1815,7 @@ class scoped_session(Generic[_S]):
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: Optional[_BindArguments] = None,
         **kw: Any,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     def scalar(
         self,
@@ -1779,8 +1857,7 @@ class scoped_session(Generic[_S]):
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: Optional[_BindArguments] = None,
         **kw: Any,
-    ) -> ScalarResult[_T]:
-        ...
+    ) -> ScalarResult[_T]: ...
 
     @overload
     def scalars(
@@ -1791,8 +1868,7 @@ class scoped_session(Generic[_S]):
         execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
         bind_arguments: Optional[_BindArguments] = None,
         **kw: Any,
-    ) -> ScalarResult[Any]:
-        ...
+    ) -> ScalarResult[Any]: ...
 
     def scalars(
         self,

@@ -1,5 +1,5 @@
 # orm/bulk_persistence.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -81,8 +81,7 @@ def _bulk_insert(
     render_nulls: bool,
     use_orm_insert_stmt: Literal[None] = ...,
     execution_options: Optional[OrmExecuteOptionsParameter] = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -95,8 +94,7 @@ def _bulk_insert(
     render_nulls: bool,
     use_orm_insert_stmt: Optional[dml.Insert] = ...,
     execution_options: Optional[OrmExecuteOptionsParameter] = ...,
-) -> cursor.CursorResult[Any]:
-    ...
+) -> cursor.CursorResult[Any]: ...
 
 
 def _bulk_insert(
@@ -236,8 +234,7 @@ def _bulk_update(
     update_changed_only: bool,
     use_orm_update_stmt: Literal[None] = ...,
     enable_check_rowcount: bool = True,
-) -> None:
-    ...
+) -> None: ...
 
 
 @overload
@@ -249,8 +246,7 @@ def _bulk_update(
     update_changed_only: bool,
     use_orm_update_stmt: Optional[dml.Update] = ...,
     enable_check_rowcount: bool = True,
-) -> _result.Result[Any]:
-    ...
+) -> _result.Result[Any]: ...
 
 
 def _bulk_update(
@@ -377,14 +373,16 @@ class ORMDMLState(AbstractORMCompileState):
                 if desc is NO_VALUE:
                     yield (
                         coercions.expect(roles.DMLColumnRole, k),
-                        coercions.expect(
-                            roles.ExpressionElementRole,
-                            v,
-                            type_=sqltypes.NullType(),
-                            is_crud=True,
-                        )
-                        if needs_to_be_cacheable
-                        else v,
+                        (
+                            coercions.expect(
+                                roles.ExpressionElementRole,
+                                v,
+                                type_=sqltypes.NullType(),
+                                is_crud=True,
+                            )
+                            if needs_to_be_cacheable
+                            else v
+                        ),
                     )
                 else:
                     yield from core_get_crud_kv_pairs(
@@ -405,13 +403,15 @@ class ORMDMLState(AbstractORMCompileState):
             else:
                 yield (
                     k,
-                    v
-                    if not needs_to_be_cacheable
-                    else coercions.expect(
-                        roles.ExpressionElementRole,
-                        v,
-                        type_=sqltypes.NullType(),
-                        is_crud=True,
+                    (
+                        v
+                        if not needs_to_be_cacheable
+                        else coercions.expect(
+                            roles.ExpressionElementRole,
+                            v,
+                            type_=sqltypes.NullType(),
+                            is_crud=True,
+                        )
                     ),
                 )
 
@@ -528,9 +528,9 @@ class ORMDMLState(AbstractORMCompileState):
             fs = fs.execution_options(**orm_level_statement._execution_options)
             fs = fs.options(*orm_level_statement._with_options)
             self.select_statement = fs
-            self.from_statement_ctx = (
-                fsc
-            ) = ORMFromStatementCompileState.create_for_statement(fs, compiler)
+            self.from_statement_ctx = fsc = (
+                ORMFromStatementCompileState.create_for_statement(fs, compiler)
+            )
             fsc.setup_dml_returning_compile_state(dml_mapper)
 
             dml_level_statement = dml_level_statement._generate()
@@ -1158,7 +1158,7 @@ class BulkORMInsert(ORMDMLState, InsertDMLState):
             execution_options,
         ) = BulkORMInsert.default_insert_options.from_execution_options(
             "_sa_orm_insert_options",
-            {"dml_strategy", "autoflush", "populate_existing"},
+            {"dml_strategy", "autoflush", "populate_existing", "render_nulls"},
             execution_options,
             statement._execution_options,
         )
@@ -1438,7 +1438,6 @@ class BulkORMUpdate(BulkUDCompileState, UpdateDMLState):
             self._resolved_values = dict(self._resolved_values)
 
         new_stmt = statement._clone()
-        new_stmt.table = mapper.local_table
 
         # note if the statement has _multi_values, these
         # are passed through to the new statement, which will then raise
@@ -1499,9 +1498,7 @@ class BulkORMUpdate(BulkUDCompileState, UpdateDMLState):
             # over and over again.   so perhaps if it could be RETURNING just
             # the elements that were based on a SQL expression and not
             # a constant.   For now it doesn't quite seem worth it
-            new_stmt = new_stmt.return_defaults(
-                *(list(mapper.local_table.primary_key))
-            )
+            new_stmt = new_stmt.return_defaults(*new_stmt.table.primary_key)
 
         if toplevel:
             new_stmt = self._setup_orm_returning(
@@ -1860,7 +1857,6 @@ class BulkORMDelete(BulkUDCompileState, DeleteDMLState):
         )
 
         new_stmt = statement._clone()
-        new_stmt.table = mapper.local_table
 
         new_crit = cls._adjust_for_extra_criteria(
             self.global_attributes, mapper

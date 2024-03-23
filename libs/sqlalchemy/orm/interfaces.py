@@ -1,5 +1,5 @@
 # orm/interfaces.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -107,6 +107,7 @@ if typing.TYPE_CHECKING:
 _StrategyKey = Tuple[Any, ...]
 
 _T = TypeVar("_T", bound=Any)
+_T_co = TypeVar("_T_co", bound=Any, covariant=True)
 
 _TLS = TypeVar("_TLS", bound="Type[LoaderStrategy]")
 
@@ -114,7 +115,7 @@ _TLS = TypeVar("_TLS", bound="Type[LoaderStrategy]")
 class ORMStatementRole(roles.StatementRole):
     __slots__ = ()
     _role_name = (
-        "Executable SQL or text() construct, including ORM " "aware objects"
+        "Executable SQL or text() construct, including ORM aware objects"
     )
 
 
@@ -148,13 +149,17 @@ class ORMColumnDescription(TypedDict):
 class _IntrospectsAnnotations:
     __slots__ = ()
 
+    @classmethod
+    def _mapper_property_name(cls) -> str:
+        return cls.__name__
+
     def found_in_pep593_annotated(self) -> Any:
         """return a copy of this object to use in declarative when the
         object is found inside of an Annotated object."""
 
         raise NotImplementedError(
-            f"Use of the {self.__class__} construct inside of an "
-            f"Annotated object is not yet supported."
+            f"Use of the {self._mapper_property_name()!r} "
+            "construct inside of an Annotated object is not yet supported."
         )
 
     def declarative_scan(
@@ -180,7 +185,8 @@ class _IntrospectsAnnotations:
         raise sa_exc.ArgumentError(
             f"Python typing annotation is required for attribute "
             f'"{cls.__name__}.{key}" when primary argument(s) for '
-            f'"{self.__class__.__name__}" construct are None or not present'
+            f'"{self._mapper_property_name()}" '
+            "construct are None or not present"
         )
 
 
@@ -653,7 +659,7 @@ class MapperProperty(
 
 
 @inspection._self_inspects
-class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
+class PropComparator(SQLORMOperations[_T_co], Generic[_T_co], ColumnOperators):
     r"""Defines SQL operations for ORM mapped attributes.
 
     SQLAlchemy allows for operators to
@@ -734,13 +740,14 @@ class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
         :attr:`.TypeEngine.comparator_factory`
 
     """
+
     __slots__ = "prop", "_parententity", "_adapt_to_entity"
 
     __visit_name__ = "orm_prop_comparator"
 
     _parententity: _InternalEntityType[Any]
     _adapt_to_entity: Optional[AliasedInsp[Any]]
-    prop: RODescriptorReference[MapperProperty[_T]]
+    prop: RODescriptorReference[MapperProperty[_T_co]]
 
     def __init__(
         self,
@@ -753,7 +760,7 @@ class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
         self._adapt_to_entity = adapt_to_entity
 
     @util.non_memoized_property
-    def property(self) -> MapperProperty[_T]:
+    def property(self) -> MapperProperty[_T_co]:
         """Return the :class:`.MapperProperty` associated with this
         :class:`.PropComparator`.
 
@@ -783,7 +790,7 @@ class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
 
     def adapt_to_entity(
         self, adapt_to_entity: AliasedInsp[Any]
-    ) -> PropComparator[_T]:
+    ) -> PropComparator[_T_co]:
         """Return a copy of this PropComparator which will use the given
         :class:`.AliasedInsp` to produce corresponding expressions.
         """
@@ -837,15 +844,13 @@ class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
 
         def operate(
             self, op: OperatorType, *other: Any, **kwargs: Any
-        ) -> ColumnElement[Any]:
-            ...
+        ) -> ColumnElement[Any]: ...
 
         def reverse_operate(
             self, op: OperatorType, other: Any, **kwargs: Any
-        ) -> ColumnElement[Any]:
-            ...
+        ) -> ColumnElement[Any]: ...
 
-    def of_type(self, class_: _EntityType[Any]) -> PropComparator[_T]:
+    def of_type(self, class_: _EntityType[Any]) -> PropComparator[_T_co]:
         r"""Redefine this object in terms of a polymorphic subclass,
         :func:`_orm.with_polymorphic` construct, or :func:`_orm.aliased`
         construct.
@@ -922,9 +927,7 @@ class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
 
         """
 
-        return self.operate(  # type: ignore
-            PropComparator.any_op, criterion, **kwargs
-        )
+        return self.operate(PropComparator.any_op, criterion, **kwargs)
 
     def has(
         self,
@@ -946,9 +949,7 @@ class PropComparator(SQLORMOperations[_T], Generic[_T], ColumnOperators):
 
         """
 
-        return self.operate(  # type: ignore
-            PropComparator.has_op, criterion, **kwargs
-        )
+        return self.operate(PropComparator.has_op, criterion, **kwargs)
 
 
 class StrategizedProperty(MapperProperty[_T]):

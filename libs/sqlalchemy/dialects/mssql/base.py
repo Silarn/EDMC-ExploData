@@ -1,5 +1,5 @@
-# mssql/base.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/mssql/base.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -1426,7 +1426,6 @@ class ROWVERSION(TIMESTAMP):
 
 
 class NTEXT(sqltypes.UnicodeText):
-
     """MSSQL NTEXT type, for variable-length unicode text up to 2^30
     characters."""
 
@@ -1537,63 +1536,24 @@ class MSUUid(sqltypes.Uuid):
         if self.native_uuid:
 
             def process(value):
-                if value is not None:
-                    value = f"""'{str(value).replace("''", "'")}'"""
-                return value
+                return f"""'{str(value).replace("''", "'")}'"""
 
             return process
         else:
             if self.as_uuid:
 
                 def process(value):
-                    if value is not None:
-                        value = f"""'{value.hex}'"""
-                    return value
+                    return f"""'{value.hex}'"""
 
                 return process
             else:
 
                 def process(value):
-                    if value is not None:
-                        value = f"""'{
-                            value.replace("-", "").replace("'", "''")
-                        }'"""
-                    return value
+                    return f"""'{
+                        value.replace("-", "").replace("'", "''")
+                    }'"""
 
                 return process
-
-    def _sentinel_value_resolver(self, dialect):
-        """Return a callable that will receive the uuid object or string
-        as it is normally passed to the DB in the parameter set, after
-        bind_processor() is called.  Convert this value to match
-        what it would be as coming back from an INSERT..OUTPUT inserted.
-
-        for the UUID type, there are four varieties of settings so here
-        we seek to convert to the string or UUID representation that comes
-        back from the driver.
-
-        """
-        character_based_uuid = (
-            not dialect.supports_native_uuid or not self.native_uuid
-        )
-
-        if character_based_uuid:
-            if self.native_uuid:
-                # for pyodbc, uuid.uuid() objects are accepted for incoming
-                # data, as well as strings. but the driver will always return
-                # uppercase strings in result sets.
-                def process(value):
-                    return str(value).upper()
-
-            else:
-
-                def process(value):
-                    return str(value)
-
-            return process
-        else:
-            # for pymssql, we get uuid.uuid() objects back.
-            return None
 
 
 class UNIQUEIDENTIFIER(sqltypes.Uuid[sqltypes._UUID_RETURN]):
@@ -1602,12 +1562,12 @@ class UNIQUEIDENTIFIER(sqltypes.Uuid[sqltypes._UUID_RETURN]):
     @overload
     def __init__(
         self: UNIQUEIDENTIFIER[_python_UUID], as_uuid: Literal[True] = ...
-    ):
-        ...
+    ): ...
 
     @overload
-    def __init__(self: UNIQUEIDENTIFIER[str], as_uuid: Literal[False] = ...):
-        ...
+    def __init__(
+        self: UNIQUEIDENTIFIER[str], as_uuid: Literal[False] = ...
+    ): ...
 
     def __init__(self, as_uuid: bool = True):
         """Construct a :class:`_mssql.UNIQUEIDENTIFIER` type.
@@ -1858,7 +1818,6 @@ class MSExecutionContext(default.DefaultExecutionContext):
     _enable_identity_insert = False
     _select_lastrowid = False
     _lastrowid = None
-    _rowcount = None
 
     dialect: MSDialect
 
@@ -1942,6 +1901,7 @@ class MSExecutionContext(default.DefaultExecutionContext):
             row = self.cursor.fetchall()[0]
             self._lastrowid = int(row[0])
 
+            self.cursor_fetch_strategy = _cursor._NO_CURSOR_DML
         elif (
             self.compiled is not None
             and is_sql_compiler(self.compiled)
@@ -1976,13 +1936,6 @@ class MSExecutionContext(default.DefaultExecutionContext):
 
     def get_lastrowid(self):
         return self._lastrowid
-
-    @property
-    def rowcount(self):
-        if self._rowcount is not None:
-            return self._rowcount
-        else:
-            return self.cursor.rowcount
 
     def handle_dbapi_exception(self, e):
         if self._enable_identity_insert:
@@ -2057,6 +2010,12 @@ class MSSQLCompiler(compiler.SQLCompiler):
     def visit_char_length_func(self, fn, **kw):
         return "LEN%s" % self.function_argspec(fn, **kw)
 
+    def visit_aggregate_strings_func(self, fn, **kw):
+        expr = fn.clauses.clauses[0]._compiler_dispatch(self, **kw)
+        kw["literal_execute"] = True
+        delimeter = fn.clauses.clauses[1]._compiler_dispatch(self, **kw)
+        return f"string_agg({expr}, {delimeter})"
+
     def visit_concat_op_expression_clauselist(
         self, clauselist, operator, **kw
     ):
@@ -2119,6 +2078,7 @@ class MSSQLCompiler(compiler.SQLCompiler):
             or (
                 # limit can use TOP with is by itself. fetch only uses TOP
                 # when it needs to because of PERCENT and/or WITH TIES
+                # TODO: Why?  shouldn't we use TOP always ?
                 select._simple_int_clause(select._fetch_clause)
                 and (
                     select._fetch_clause_options["percent"]
@@ -2379,10 +2339,13 @@ class MSSQLCompiler(compiler.SQLCompiler):
         return ""
 
     def order_by_clause(self, select, **kw):
-        # MSSQL only allows ORDER BY in subqueries if there is a LIMIT
+        # MSSQL only allows ORDER BY in subqueries if there is a LIMIT:
+        # "The ORDER BY clause is invalid in views, inline functions,
+        # derived tables, subqueries, and common table expressions,
+        # unless TOP, OFFSET or FOR XML is also specified."
         if (
             self.is_subquery()
-            and not select._limit
+            and not self._use_top(select)
             and (
                 select._offset is None
                 or not self.dialect._supports_offset_fetch
@@ -2478,10 +2441,12 @@ class MSSQLCompiler(compiler.SQLCompiler):
             type_expression = "ELSE CAST(JSON_VALUE(%s, %s) AS %s)" % (
                 self.process(binary.left, **kw),
                 self.process(binary.right, **kw),
-                "FLOAT"
-                if isinstance(binary.type, sqltypes.Float)
-                else "NUMERIC(%s, %s)"
-                % (binary.type.precision, binary.type.scale),
+                (
+                    "FLOAT"
+                    if isinstance(binary.type, sqltypes.Float)
+                    else "NUMERIC(%s, %s)"
+                    % (binary.type.precision, binary.type.scale)
+                ),
             )
         elif binary.type._type_affinity is sqltypes.Boolean:
             # the NULL handling is particularly weird with boolean, so
@@ -2517,7 +2482,6 @@ class MSSQLCompiler(compiler.SQLCompiler):
 
 
 class MSSQLStrictCompiler(MSSQLCompiler):
-
     """A subclass of MSSQLCompiler which disables the usage of bind
     parameters where not allowed natively by MS-SQL.
 

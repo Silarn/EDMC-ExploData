@@ -1,5 +1,5 @@
 # sql/selectable.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -154,12 +154,10 @@ _LabelConventionCallable = Callable[
 
 class _JoinTargetProtocol(Protocol):
     @util.ro_non_memoized_property
-    def _from_objects(self) -> List[FromClause]:
-        ...
+    def _from_objects(self) -> List[FromClause]: ...
 
     @util.ro_non_memoized_property
-    def entity_namespace(self) -> _EntityNamespace:
-        ...
+    def entity_namespace(self) -> _EntityNamespace: ...
 
 
 _JoinTargetElement = Union["FromClause", _JoinTargetProtocol]
@@ -323,9 +321,7 @@ class Selectable(ReturnsRows):
         object, returning a copy of this :class:`_expression.FromClause`.
 
         """
-        return util.preloaded.sql_util.ClauseAdapter(alias).traverse(  # type: ignore  # noqa: E501
-            self
-        )
+        return util.preloaded.sql_util.ClauseAdapter(alias).traverse(self)
 
     def corresponding_column(
         self, column: KeyedColumnElement[Any], require_embedded: bool = False
@@ -467,9 +463,9 @@ class HasSuffixes:
 
 
 class HasHints:
-    _hints: util.immutabledict[
-        Tuple[FromClause, str], str
-    ] = util.immutabledict()
+    _hints: util.immutabledict[Tuple[FromClause, str], str] = (
+        util.immutabledict()
+    )
     _statement_hints: Tuple[Tuple[str, str], ...] = ()
 
     _has_hints_traverse_internals: _TraverseInternalsType = [
@@ -990,8 +986,7 @@ class FromClause(roles.AnonymizedFromClauseRole, Selectable):
 
         def self_group(
             self, against: Optional[OperatorType] = None
-        ) -> Union[FromGrouping, Self]:
-            ...
+        ) -> Union[FromGrouping, Self]: ...
 
 
 class NamedFromClause(FromClause):
@@ -1420,7 +1415,7 @@ class Join(roles.DMLTableRole, FromClause):
                 continue
             for fk in sorted(
                 b.foreign_keys,
-                key=lambda fk: fk.parent._creation_order,  # type: ignore
+                key=lambda fk: fk.parent._creation_order,
             ):
                 if (
                     consider_as_foreign_keys is not None
@@ -1441,7 +1436,7 @@ class Join(roles.DMLTableRole, FromClause):
             if left is not b:
                 for fk in sorted(
                     left.foreign_keys,
-                    key=lambda fk: fk.parent._creation_order,  # type: ignore
+                    key=lambda fk: fk.parent._creation_order,
                 ):
                     if (
                         consider_as_foreign_keys is not None
@@ -2258,9 +2253,9 @@ class SelectsRows(ReturnsRows):
             repeated = False
 
             if not c._render_label_in_columns_clause:
-                effective_name = (
-                    required_label_name
-                ) = fallback_label_name = None
+                effective_name = required_label_name = fallback_label_name = (
+                    None
+                )
             elif label_style_none:
                 if TYPE_CHECKING:
                     assert is_column_element(c)
@@ -2272,9 +2267,9 @@ class SelectsRows(ReturnsRows):
                     assert is_column_element(c)
 
                 if table_qualified:
-                    required_label_name = (
-                        effective_name
-                    ) = fallback_label_name = c._tq_label
+                    required_label_name = effective_name = (
+                        fallback_label_name
+                    ) = c._tq_label
                 else:
                     effective_name = fallback_label_name = c._non_anon_label
                     required_label_name = None
@@ -2305,9 +2300,9 @@ class SelectsRows(ReturnsRows):
                         else:
                             fallback_label_name = c._anon_name_label
                     else:
-                        required_label_name = (
-                            effective_name
-                        ) = fallback_label_name = expr_label
+                        required_label_name = effective_name = (
+                            fallback_label_name
+                        ) = expr_label
 
             if effective_name is not None:
                 if TYPE_CHECKING:
@@ -2321,13 +2316,13 @@ class SelectsRows(ReturnsRows):
                         # different column under the same name.  apply
                         # disambiguating label
                         if table_qualified:
-                            required_label_name = (
-                                fallback_label_name
-                            ) = c._anon_tq_label
+                            required_label_name = fallback_label_name = (
+                                c._anon_tq_label
+                            )
                         else:
-                            required_label_name = (
-                                fallback_label_name
-                            ) = c._anon_name_label
+                            required_label_name = fallback_label_name = (
+                                c._anon_name_label
+                            )
 
                         if anon_for_dupe_key and required_label_name in names:
                             # here, c._anon_tq_label is definitely unique to
@@ -2342,14 +2337,14 @@ class SelectsRows(ReturnsRows):
                             # subsequent occurrences of the column so that the
                             # original stays non-ambiguous
                             if table_qualified:
-                                required_label_name = (
-                                    fallback_label_name
-                                ) = c._dedupe_anon_tq_label_idx(dedupe_hash)
+                                required_label_name = fallback_label_name = (
+                                    c._dedupe_anon_tq_label_idx(dedupe_hash)
+                                )
                                 dedupe_hash += 1
                             else:
-                                required_label_name = (
-                                    fallback_label_name
-                                ) = c._dedupe_anon_label_idx(dedupe_hash)
+                                required_label_name = fallback_label_name = (
+                                    c._dedupe_anon_label_idx(dedupe_hash)
+                                )
                                 dedupe_hash += 1
                             repeated = True
                         else:
@@ -2358,14 +2353,14 @@ class SelectsRows(ReturnsRows):
                         # same column under the same name. apply the "dedupe"
                         # label so that the original stays non-ambiguous
                         if table_qualified:
-                            required_label_name = (
-                                fallback_label_name
-                            ) = c._dedupe_anon_tq_label_idx(dedupe_hash)
+                            required_label_name = fallback_label_name = (
+                                c._dedupe_anon_tq_label_idx(dedupe_hash)
+                            )
                             dedupe_hash += 1
                         else:
-                            required_label_name = (
-                                fallback_label_name
-                            ) = c._dedupe_anon_label_idx(dedupe_hash)
+                            required_label_name = fallback_label_name = (
+                                c._dedupe_anon_label_idx(dedupe_hash)
+                            )
                             dedupe_hash += 1
                         repeated = True
                 else:
@@ -2436,7 +2431,7 @@ class HasCTE(roles.HasCTERole, SelectsRows):
             SELECT t.c1, t.c2
             FROM t
 
-        Above, the "anon_1" CTE is not referred towards in the SELECT
+        Above, the "anon_1" CTE is not referenced in the SELECT
         statement, however still accomplishes the task of running an INSERT
         statement.
 
@@ -2982,12 +2977,12 @@ class TableClause(roles.DMLTableRole, Immutable, NamedFromClause):
     if TYPE_CHECKING:
 
         @util.ro_non_memoized_property
-        def columns(self) -> ReadOnlyColumnCollection[str, ColumnClause[Any]]:
-            ...
+        def columns(
+            self,
+        ) -> ReadOnlyColumnCollection[str, ColumnClause[Any]]: ...
 
         @util.ro_non_memoized_property
-        def c(self) -> ReadOnlyColumnCollection[str, ColumnClause[Any]]:
-            ...
+        def c(self) -> ReadOnlyColumnCollection[str, ColumnClause[Any]]: ...
 
     def __str__(self) -> str:
         if self.schema is not None:
@@ -3151,7 +3146,7 @@ class Values(roles.InElementRole, Generative, LateralFromClause):
 
     __visit_name__ = "values"
 
-    _data: Tuple[List[Tuple[Any, ...]], ...] = ()
+    _data: Tuple[Sequence[Tuple[Any, ...]], ...] = ()
 
     _unnamed: bool
     _traverse_internals: _TraverseInternalsType = [
@@ -3169,6 +3164,7 @@ class Values(roles.InElementRole, Generative, LateralFromClause):
     ):
         super().__init__()
         self._column_args = columns
+
         if name is None:
             self._unnamed = True
             self.name = _anonymous_label.safe_construct(id(self), "anon")
@@ -3234,7 +3230,7 @@ class Values(roles.InElementRole, Generative, LateralFromClause):
         return self
 
     @_generative
-    def data(self, values: List[Tuple[Any, ...]]) -> Self:
+    def data(self, values: Sequence[Tuple[Any, ...]]) -> Self:
         """Return a new :class:`_expression.Values` construct,
         adding the given data to the data list.
 
@@ -3262,6 +3258,13 @@ class Values(roles.InElementRole, Generative, LateralFromClause):
 
     def _populate_column_collection(self) -> None:
         for c in self._column_args:
+            if c.table is not None and c.table is not self:
+                _, c = c._make_proxy(self)
+            else:
+                # if the column was used in other contexts, ensure
+                # no memoizations of other FROM clauses.
+                # see test_values.py -> test_auto_proxy_select_direct_col
+                c._reset_memoizations()
             self._columns.add(c)
             c.table = self
 
@@ -3294,7 +3297,7 @@ class ScalarValues(roles.InElementRole, GroupedElement, ColumnElement[Any]):
     def __init__(
         self,
         columns: Sequence[ColumnClause[Any]],
-        data: Tuple[List[Tuple[Any, ...]], ...],
+        data: Tuple[Sequence[Tuple[Any, ...]], ...],
         literal_binds: bool,
     ):
         super().__init__()
@@ -3686,8 +3689,7 @@ class SelectStatementGrouping(GroupedElement, SelectBase, Generic[_SB]):
 
     if TYPE_CHECKING:
 
-        def _ungroup(self) -> _SB:
-            ...
+        def _ungroup(self) -> _SB: ...
 
     # def _generate_columns_plus_names(
     #    self, anon_for_dupe_key: bool
@@ -3907,14 +3909,12 @@ class GenerativeSelect(SelectBase, Generative):
     @overload
     def _offset_or_limit_clause_asint(
         self, clause: ColumnElement[Any], attrname: str
-    ) -> NoReturn:
-        ...
+    ) -> NoReturn: ...
 
     @overload
     def _offset_or_limit_clause_asint(
         self, clause: Optional[_OffsetLimitParam], attrname: str
-    ) -> Optional[int]:
-        ...
+    ) -> Optional[int]: ...
 
     def _offset_or_limit_clause_asint(
         self, clause: Optional[ColumnElement[Any]], attrname: str
@@ -4479,8 +4479,9 @@ class SelectState(util.MemoizedSlots, CompileState):
     if TYPE_CHECKING:
 
         @classmethod
-        def get_plugin_class(cls, statement: Executable) -> Type[SelectState]:
-            ...
+        def get_plugin_class(
+            cls, statement: Executable
+        ) -> Type[SelectState]: ...
 
     def __init__(
         self,
@@ -4744,7 +4745,7 @@ class SelectState(util.MemoizedSlots, CompileState):
         Dict[str, ColumnElement[Any]],
     ]:
         with_cols: Dict[str, ColumnElement[Any]] = {
-            c._tq_label or c.key: c  # type: ignore
+            c._tq_label or c.key: c
             for c in self.statement._all_selected_columns
             if c._allow_label_resolve
         }
@@ -5012,7 +5013,7 @@ class _MemoizedSelectEntities(
         c.__dict__ = {k: v for k, v in self.__dict__.items()}
 
         c._is_clone_of = self.__dict__.get("_is_clone_of", self)
-        return c  # type: ignore
+        return c
 
     @classmethod
     def _generate_for_statement(cls, select_stmt: Select[Any]) -> None:
@@ -5171,21 +5172,17 @@ class Select(
         @overload
         def scalar_subquery(
             self: Select[Tuple[_MAYBE_ENTITY]],
-        ) -> ScalarSelect[Any]:
-            ...
+        ) -> ScalarSelect[Any]: ...
 
         @overload
         def scalar_subquery(
             self: Select[Tuple[_NOT_ENTITY]],
-        ) -> ScalarSelect[_NOT_ENTITY]:
-            ...
+        ) -> ScalarSelect[_NOT_ENTITY]: ...
 
         @overload
-        def scalar_subquery(self) -> ScalarSelect[Any]:
-            ...
+        def scalar_subquery(self) -> ScalarSelect[Any]: ...
 
-        def scalar_subquery(self) -> ScalarSelect[Any]:
-            ...
+        def scalar_subquery(self) -> ScalarSelect[Any]: ...
 
     def filter_by(self, **kwargs: Any) -> Self:
         r"""apply the given filtering criterion as a WHERE clause
@@ -5764,20 +5761,17 @@ class Select(
     # statically generated** by tools/generate_sel_v1_overloads.py
 
     @overload
-    def with_only_columns(self, __ent0: _TCCA[_T0]) -> Select[Tuple[_T0]]:
-        ...
+    def with_only_columns(self, __ent0: _TCCA[_T0]) -> Select[Tuple[_T0]]: ...
 
     @overload
     def with_only_columns(
         self, __ent0: _TCCA[_T0], __ent1: _TCCA[_T1]
-    ) -> Select[Tuple[_T0, _T1]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1]]: ...
 
     @overload
     def with_only_columns(
         self, __ent0: _TCCA[_T0], __ent1: _TCCA[_T1], __ent2: _TCCA[_T2]
-    ) -> Select[Tuple[_T0, _T1, _T2]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1, _T2]]: ...
 
     @overload
     def with_only_columns(
@@ -5786,8 +5780,7 @@ class Select(
         __ent1: _TCCA[_T1],
         __ent2: _TCCA[_T2],
         __ent3: _TCCA[_T3],
-    ) -> Select[Tuple[_T0, _T1, _T2, _T3]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1, _T2, _T3]]: ...
 
     @overload
     def with_only_columns(
@@ -5797,8 +5790,7 @@ class Select(
         __ent2: _TCCA[_T2],
         __ent3: _TCCA[_T3],
         __ent4: _TCCA[_T4],
-    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4]]: ...
 
     @overload
     def with_only_columns(
@@ -5809,8 +5801,7 @@ class Select(
         __ent3: _TCCA[_T3],
         __ent4: _TCCA[_T4],
         __ent5: _TCCA[_T5],
-    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4, _T5]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4, _T5]]: ...
 
     @overload
     def with_only_columns(
@@ -5822,8 +5813,7 @@ class Select(
         __ent4: _TCCA[_T4],
         __ent5: _TCCA[_T5],
         __ent6: _TCCA[_T6],
-    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6]]: ...
 
     @overload
     def with_only_columns(
@@ -5836,8 +5826,7 @@ class Select(
         __ent5: _TCCA[_T5],
         __ent6: _TCCA[_T6],
         __ent7: _TCCA[_T7],
-    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6, _T7]]:
-        ...
+    ) -> Select[Tuple[_T0, _T1, _T2, _T3, _T4, _T5, _T6, _T7]]: ...
 
     # END OVERLOADED FUNCTIONS self.with_only_columns
 
@@ -5847,8 +5836,7 @@ class Select(
         *entities: _ColumnsClauseArgument[Any],
         maintain_column_froms: bool = False,
         **__kw: Any,
-    ) -> Select[Any]:
-        ...
+    ) -> Select[Any]: ...
 
     @_generative
     def with_only_columns(
@@ -6515,14 +6503,12 @@ class ScalarSelect(
     @overload
     def self_group(
         self: ScalarSelect[Any], against: Optional[OperatorType] = None
-    ) -> ScalarSelect[Any]:
-        ...
+    ) -> ScalarSelect[Any]: ...
 
     @overload
     def self_group(
         self: ColumnElement[Any], against: Optional[OperatorType] = None
-    ) -> ColumnElement[Any]:
-        ...
+    ) -> ColumnElement[Any]: ...
 
     def self_group(
         self, against: Optional[OperatorType] = None
@@ -6531,8 +6517,7 @@ class ScalarSelect(
 
     if TYPE_CHECKING:
 
-        def _ungroup(self) -> Select[Any]:
-            ...
+        def _ungroup(self) -> Select[Any]: ...
 
     @_generative
     def correlate(
@@ -6720,7 +6705,7 @@ class Exists(UnaryExpression[bool]):
         )
         return e
 
-    def select_from(self, *froms: FromClause) -> Self:
+    def select_from(self, *froms: _FromClauseArgument) -> Self:
         """Return a new :class:`_expression.Exists` construct,
         applying the given
         expression to the :meth:`_expression.Select.select_from`

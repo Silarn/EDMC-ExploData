@@ -1,5 +1,5 @@
 # orm/dependency.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -167,9 +167,11 @@ class DependencyProcessor:
             sum_ = state.manager[self.key].impl.get_all_pending(
                 state,
                 state.dict,
-                self._passive_delete_flag
-                if isdelete
-                else attributes.PASSIVE_NO_INITIALIZE,
+                (
+                    self._passive_delete_flag
+                    if isdelete
+                    else attributes.PASSIVE_NO_INITIALIZE
+                ),
             )
 
             if not sum_:

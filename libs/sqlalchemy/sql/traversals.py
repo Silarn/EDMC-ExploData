@@ -1,5 +1,5 @@
 # sql/traversals.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -56,15 +56,15 @@ def _preconfigure_traversals(target_hierarchy: Type[Any]) -> None:
         if hasattr(cls, "_generate_cache_attrs") and hasattr(
             cls, "_traverse_internals"
         ):
-            cls._generate_cache_attrs()  # type: ignore
+            cls._generate_cache_attrs()
             _copy_internals.generate_dispatch(
-                cls,  # type: ignore
-                cls._traverse_internals,  # type: ignore
+                cls,
+                cls._traverse_internals,
                 "_generated_copy_internals_traversal",
             )
             _get_children.generate_dispatch(
-                cls,  # type: ignore
-                cls._traverse_internals,  # type: ignore
+                cls,
+                cls._traverse_internals,
                 "_generated_get_children_traversal",
             )
 
@@ -80,16 +80,13 @@ class HasShallowCopy(HasTraverseInternals):
 
     if typing.TYPE_CHECKING:
 
-        def _generated_shallow_copy_traversal(self, other: Self) -> None:
-            ...
+        def _generated_shallow_copy_traversal(self, other: Self) -> None: ...
 
         def _generated_shallow_from_dict_traversal(
             self, d: Dict[str, Any]
-        ) -> None:
-            ...
+        ) -> None: ...
 
-        def _generated_shallow_to_dict_traversal(self) -> Dict[str, Any]:
-            ...
+        def _generated_shallow_to_dict_traversal(self) -> Dict[str, Any]: ...
 
     @classmethod
     def _generate_shallow_copy(
@@ -312,9 +309,11 @@ class _CopyInternalsTraversal(HasTraversalDispatch):
         # sequence of 2-tuples
         return [
             (
-                clone(key, **kw)
-                if hasattr(key, "__clause_element__")
-                else key,
+                (
+                    clone(key, **kw)
+                    if hasattr(key, "__clause_element__")
+                    else key
+                ),
                 clone(value, **kw),
             )
             for key, value in element
@@ -336,9 +335,11 @@ class _CopyInternalsTraversal(HasTraversalDispatch):
         def copy(elem):
             if isinstance(elem, (list, tuple)):
                 return [
-                    clone(value, **kw)
-                    if hasattr(value, "__clause_element__")
-                    else value
+                    (
+                        clone(value, **kw)
+                        if hasattr(value, "__clause_element__")
+                        else value
+                    )
                     for value in elem
                 ]
             elif isinstance(elem, dict):

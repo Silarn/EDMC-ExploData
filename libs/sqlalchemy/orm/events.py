@@ -1,5 +1,5 @@
 # orm/events.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -494,13 +494,13 @@ class InstanceEvents(event.Events[ClassManager[Any]]):
 
         .. seealso::
 
+            :ref:`mapped_class_load_events`
+
             :meth:`.InstanceEvents.init`
 
             :meth:`.InstanceEvents.refresh`
 
             :meth:`.SessionEvents.loaded_as_persistent`
-
-            :ref:`mapping_constructors`
 
         """
 
@@ -533,6 +533,8 @@ class InstanceEvents(event.Events[ClassManager[Any]]):
          attributes were populated.
 
         .. seealso::
+
+            :ref:`mapped_class_load_events`
 
             :meth:`.InstanceEvents.load`
 
@@ -576,6 +578,8 @@ class InstanceEvents(event.Events[ClassManager[Any]]):
          were populated.
 
         .. seealso::
+
+            :ref:`mapped_class_load_events`
 
             :ref:`orm_server_defaults`
 
@@ -725,9 +729,9 @@ class _EventsHold(event.RefCollection[_ET]):
 
 
 class _InstanceEventsHold(_EventsHold[_ET]):
-    all_holds: weakref.WeakKeyDictionary[
-        Any, Any
-    ] = weakref.WeakKeyDictionary()
+    all_holds: weakref.WeakKeyDictionary[Any, Any] = (
+        weakref.WeakKeyDictionary()
+    )
 
     def resolve(self, class_: Type[_O]) -> Optional[ClassManager[_O]]:
         return instrumentation.opt_manager_of_class(class_)
@@ -1935,7 +1939,7 @@ class SessionEvents(event.Events[Session]):
             @event.listens_for(Session, "after_soft_rollback")
             def do_something(session, previous_transaction):
                 if session.is_active:
-                    session.execute("select * from some_table")
+                    session.execute(text("select * from some_table"))
 
         :param session: The target :class:`.Session`.
         :param previous_transaction: The :class:`.SessionTransaction`
@@ -2035,7 +2039,14 @@ class SessionEvents(event.Events[Session]):
         transaction: SessionTransaction,
         connection: Connection,
     ) -> None:
-        """Execute after a transaction is begun on a connection
+        """Execute after a transaction is begun on a connection.
+
+        .. note:: This event is called within the process of the
+          :class:`_orm.Session` modifying its own internal state.
+          To invoke SQL operations within this hook, use the
+          :class:`_engine.Connection` provided to the event;
+          do not run SQL operations using the :class:`_orm.Session`
+          directly.
 
         :param session: The target :class:`.Session`.
         :param transaction: The :class:`.SessionTransaction`.

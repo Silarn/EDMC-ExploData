@@ -1,5 +1,5 @@
 # sql/crud.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -394,8 +394,7 @@ def _create_bind_param(
     required: bool = False,
     name: Optional[str] = None,
     **kw: Any,
-) -> str:
-    ...
+) -> str: ...
 
 
 @overload
@@ -404,8 +403,7 @@ def _create_bind_param(
     col: ColumnElement[Any],
     value: Any,
     **kw: Any,
-) -> str:
-    ...
+) -> str: ...
 
 
 def _create_bind_param(
@@ -491,10 +489,10 @@ def _key_getters_for_crud_column(
             key: Union[ColumnClause[Any], str]
         ) -> Union[str, Tuple[str, str]]:
             str_key = c_key_role(key)
-            if hasattr(key, "table") and key.table in _et:  # type: ignore
+            if hasattr(key, "table") and key.table in _et:
                 return (key.table.name, str_key)  # type: ignore
             else:
-                return str_key  # type: ignore
+                return str_key
 
         def _getattr_col_key(
             col: ColumnClause[Any],
@@ -513,7 +511,7 @@ def _key_getters_for_crud_column(
                 return col.key
 
     else:
-        _column_as_key = functools.partial(  # type: ignore
+        _column_as_key = functools.partial(
             coercions.expect_as_key, roles.DMLColumnRole
         )
         _getattr_col_key = _col_bind_name = operator.attrgetter("key")  # type: ignore  # noqa: E501
@@ -647,6 +645,9 @@ def _scan_cols(
 
     compiler_implicit_returning = compiler.implicit_returning
 
+    # TODO - see TODO(return_defaults_columns) below
+    # cols_in_params = set()
+
     for c in cols:
         # scan through every column in the target table
 
@@ -671,6 +672,9 @@ def _scan_cols(
                 insert_null_pk_still_autoincrements,
                 kw,
             )
+
+            # TODO - see TODO(return_defaults_columns) below
+            # cols_in_params.add(c)
 
         elif isinsert:
             # no parameter is present and it's an insert.
@@ -764,6 +768,19 @@ def _scan_cols(
             if c in remaining_supplemental
         )
 
+    # TODO(return_defaults_columns): there can still be more columns in
+    # _return_defaults_columns in the case that they are from something like an
+    # aliased of the table. we can add them here, however this breaks other ORM
+    # things. so this is for another day. see
+    # test/orm/dml/test_update_delete_where.py -> test_update_from_alias
+
+    # if stmt._return_defaults_columns:
+    #     compiler_implicit_returning.extend(
+    #         set(stmt._return_defaults_columns)
+    #         .difference(compiler_implicit_returning)
+    #         .difference(cols_in_params)
+    #     )
+
     return (use_insertmanyvalues, use_sentinel_columns)
 
 
@@ -840,10 +857,12 @@ def _append_param_parameter(
             c,
             value,
             required=value is REQUIRED,
-            name=_col_bind_name(c)
-            if not _compile_state_isinsert(compile_state)
-            or not compile_state._has_multi_parameters
-            else "%s_m0" % _col_bind_name(c),
+            name=(
+                _col_bind_name(c)
+                if not _compile_state_isinsert(compile_state)
+                or not compile_state._has_multi_parameters
+                else "%s_m0" % _col_bind_name(c)
+            ),
             accumulate_bind_names=accumulated_bind_names,
             **kw,
         )
@@ -865,10 +884,12 @@ def _append_param_parameter(
             compiler,
             c,
             value,
-            name=_col_bind_name(c)
-            if not _compile_state_isinsert(compile_state)
-            or not compile_state._has_multi_parameters
-            else "%s_m0" % _col_bind_name(c),
+            name=(
+                _col_bind_name(c)
+                if not _compile_state_isinsert(compile_state)
+                or not compile_state._has_multi_parameters
+                else "%s_m0" % _col_bind_name(c)
+            ),
             accumulate_bind_names=accumulated_bind_names,
             **kw,
         )
@@ -1194,8 +1215,7 @@ def _create_insert_prefetch_bind_param(
     c: ColumnElement[Any],
     process: Literal[True] = ...,
     **kw: Any,
-) -> str:
-    ...
+) -> str: ...
 
 
 @overload
@@ -1204,8 +1224,7 @@ def _create_insert_prefetch_bind_param(
     c: ColumnElement[Any],
     process: Literal[False],
     **kw: Any,
-) -> elements.BindParameter[Any]:
-    ...
+) -> elements.BindParameter[Any]: ...
 
 
 def _create_insert_prefetch_bind_param(
@@ -1228,8 +1247,7 @@ def _create_update_prefetch_bind_param(
     c: ColumnElement[Any],
     process: Literal[True] = ...,
     **kw: Any,
-) -> str:
-    ...
+) -> str: ...
 
 
 @overload
@@ -1238,8 +1256,7 @@ def _create_update_prefetch_bind_param(
     c: ColumnElement[Any],
     process: Literal[False],
     **kw: Any,
-) -> elements.BindParameter[Any]:
-    ...
+) -> elements.BindParameter[Any]: ...
 
 
 def _create_update_prefetch_bind_param(
@@ -1559,7 +1576,11 @@ def _get_returning_modifiers(compiler, stmt, compile_state, toplevel):
         should_implicit_return_defaults = (
             implicit_returning and stmt._return_defaults
         )
-        explicit_returning = should_implicit_return_defaults or stmt._returning
+        explicit_returning = (
+            should_implicit_return_defaults
+            or stmt._returning
+            or stmt._supplemental_returning
+        )
         use_insertmanyvalues = (
             toplevel
             and compiler.for_executemany

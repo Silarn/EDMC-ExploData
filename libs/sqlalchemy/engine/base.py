@@ -1,5 +1,5 @@
 # engine/base.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -109,6 +109,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
 
     """
 
+    dialect: Dialect
     dispatch: dispatcher[ConnectionEventsTarget]
 
     _sqla_logger_namespace = "sqlalchemy.engine.Connection"
@@ -205,7 +206,11 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
 
     @property
     def _schema_translate_map(self) -> Optional[SchemaTranslateMapType]:
-        return self._execution_options.get("schema_translate_map", None)
+        schema_translate_map: Optional[SchemaTranslateMapType] = (
+            self._execution_options.get("schema_translate_map", None)
+        )
+
+        return schema_translate_map
 
     def schema_for_object(self, obj: HasSchemaAttr) -> Optional[str]:
         """Return the schema name for the given schema item taking into
@@ -214,9 +219,9 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         """
 
         name = obj.schema
-        schema_translate_map: Optional[
-            SchemaTranslateMapType
-        ] = self._execution_options.get("schema_translate_map", None)
+        schema_translate_map: Optional[SchemaTranslateMapType] = (
+            self._execution_options.get("schema_translate_map", None)
+        )
 
         if (
             schema_translate_map
@@ -246,13 +251,12 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         yield_per: int = ...,
         insertmanyvalues_page_size: int = ...,
         schema_translate_map: Optional[SchemaTranslateMapType] = ...,
+        preserve_rowcount: bool = False,
         **opt: Any,
-    ) -> Connection:
-        ...
+    ) -> Connection: ...
 
     @overload
-    def execution_options(self, **opt: Any) -> Connection:
-        ...
+    def execution_options(self, **opt: Any) -> Connection: ...
 
     def execution_options(self, **opt: Any) -> Connection:
         r"""Set non-SQL options for the connection which take effect
@@ -487,6 +491,18 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
           .. seealso::
 
             :ref:`schema_translating`
+
+        :param preserve_rowcount: Boolean; when True, the ``cursor.rowcount``
+          attribute will be unconditionally memoized within the result and
+          made available via the :attr:`.CursorResult.rowcount` attribute.
+          Normally, this attribute is only preserved for UPDATE and DELETE
+          statements.  Using this option, the DBAPIs rowcount value can
+          be accessed for other kinds of statements such as INSERT and SELECT,
+          to the degree that the DBAPI supports these statements.  See
+          :attr:`.CursorResult.rowcount` for notes regarding the behavior
+          of this attribute.
+
+          .. versionadded:: 2.0.28
 
         .. seealso::
 
@@ -814,7 +830,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
 
         The above code is not  fundamentally any different in its behavior than
         the following code  which does not use
-        :meth:`_engine.Connection.begin`; the below style is referred towards
+        :meth:`_engine.Connection.begin`; the below style is known
         as "commit as you go" style::
 
             with engine.connect() as conn:
@@ -1258,8 +1274,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         parameters: Optional[_CoreSingleExecuteParams] = None,
         *,
         execution_options: Optional[CoreExecuteOptionsParameter] = None,
-    ) -> Optional[_T]:
-        ...
+    ) -> Optional[_T]: ...
 
     @overload
     def scalar(
@@ -1268,8 +1283,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         parameters: Optional[_CoreSingleExecuteParams] = None,
         *,
         execution_options: Optional[CoreExecuteOptionsParameter] = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     def scalar(
         self,
@@ -1307,8 +1321,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         parameters: Optional[_CoreAnyExecuteParams] = None,
         *,
         execution_options: Optional[CoreExecuteOptionsParameter] = None,
-    ) -> ScalarResult[_T]:
-        ...
+    ) -> ScalarResult[_T]: ...
 
     @overload
     def scalars(
@@ -1317,8 +1330,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         parameters: Optional[_CoreAnyExecuteParams] = None,
         *,
         execution_options: Optional[CoreExecuteOptionsParameter] = None,
-    ) -> ScalarResult[Any]:
-        ...
+    ) -> ScalarResult[Any]: ...
 
     def scalars(
         self,
@@ -1352,8 +1364,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         parameters: Optional[_CoreAnyExecuteParams] = None,
         *,
         execution_options: Optional[CoreExecuteOptionsParameter] = None,
-    ) -> CursorResult[_T]:
-        ...
+    ) -> CursorResult[_T]: ...
 
     @overload
     def execute(
@@ -1362,8 +1373,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         parameters: Optional[_CoreAnyExecuteParams] = None,
         *,
         execution_options: Optional[CoreExecuteOptionsParameter] = None,
-    ) -> CursorResult[Any]:
-        ...
+    ) -> CursorResult[Any]: ...
 
     def execute(
         self,
@@ -1494,7 +1504,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
     ) -> CursorResult[Any]:
         """Execute a schema.DDL object."""
 
-        execution_options = ddl._execution_options.merge_with(
+        exec_opts = ddl._execution_options.merge_with(
             self._execution_options, execution_options
         )
 
@@ -1508,12 +1518,11 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
                 event_multiparams,
                 event_params,
             ) = self._invoke_before_exec_event(
-                ddl, distilled_parameters, execution_options
+                ddl, distilled_parameters, exec_opts
             )
         else:
             event_multiparams = event_params = None
 
-        exec_opts = self._execution_options.merge_with(execution_options)
         schema_translate_map = exec_opts.get("schema_translate_map", None)
 
         dialect = self.dialect
@@ -1526,7 +1535,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
             dialect.execution_ctx_cls._init_ddl,
             compiled,
             None,
-            execution_options,
+            exec_opts,
             compiled,
         )
         if self._has_events or self.engine._has_events:
@@ -1535,7 +1544,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
                 ddl,
                 event_multiparams,
                 event_params,
-                execution_options,
+                exec_opts,
                 ret,
             )
         return ret
@@ -1836,10 +1845,7 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
         context.pre_exec()
 
         if context.execute_style is ExecuteStyle.INSERTMANYVALUES:
-            return self._exec_insertmany_context(
-                dialect,
-                context,
-            )
+            return self._exec_insertmany_context(dialect, context)
         else:
             return self._exec_single_context(
                 dialect, context, statement, parameters
@@ -2014,14 +2020,19 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
 
         engine_events = self._has_events or self.engine._has_events
         if self.dialect._has_events:
-            do_execute_dispatch: Iterable[
-                Any
-            ] = self.dialect.dispatch.do_execute
+            do_execute_dispatch: Iterable[Any] = (
+                self.dialect.dispatch.do_execute
+            )
         else:
             do_execute_dispatch = ()
 
         if self._echo:
             stats = context._get_cache_stats() + " (insertmanyvalues)"
+
+        preserve_rowcount = context.execution_options.get(
+            "preserve_rowcount", False
+        )
+        rowcount = 0
 
         for imv_batch in dialect._deliver_insertmanyvalues_batches(
             cursor,
@@ -2063,15 +2074,16 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
             if self._echo:
                 self._log_info(sql_util._long_statement(sub_stmt))
 
-                imv_stats = f""" {
-                            imv_batch.batchnum}/{imv_batch.total_batches} ({
-                            'ordered'
-                            if imv_batch.rows_sorted else 'unordered'
-                        }{
-                            '; batch not supported'
-                            if imv_batch.is_downgraded
-                            else ''
-                        })"""
+                imv_stats = f""" {imv_batch.batchnum}/{
+                            imv_batch.total_batches
+                } ({
+                    'ordered'
+                    if imv_batch.rows_sorted else 'unordered'
+                }{
+                    '; batch not supported'
+                    if imv_batch.is_downgraded
+                    else ''
+                })"""
 
                 if imv_batch.batchnum == 1:
                     stats += imv_stats
@@ -2132,8 +2144,14 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
                     context.executemany,
                 )
 
+            if preserve_rowcount:
+                rowcount += imv_batch.current_batch_size
+
         try:
             context.post_exec()
+
+            if preserve_rowcount:
+                context._rowcount = rowcount  # type: ignore[attr-defined]
 
             result = context._setup_result_proxy()
 
@@ -2376,9 +2394,9 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
                 None,
                 cast(Exception, e),
                 dialect.loaded_dbapi.Error,
-                hide_parameters=engine.hide_parameters
-                if engine is not None
-                else False,
+                hide_parameters=(
+                    engine.hide_parameters if engine is not None else False
+                ),
                 connection_invalidated=is_disconnect,
                 dialect=dialect,
             )
@@ -2415,9 +2433,9 @@ class Connection(ConnectionEventsTarget, inspection.Inspectable["Inspector"]):
                     break
 
             if sqlalchemy_exception and is_disconnect != ctx.is_disconnect:
-                sqlalchemy_exception.connection_invalidated = (
-                    is_disconnect
-                ) = ctx.is_disconnect
+                sqlalchemy_exception.connection_invalidated = is_disconnect = (
+                    ctx.is_disconnect
+                )
 
         if newraise:
             raise newraise.with_traceback(exc_info[2]) from e
@@ -2986,7 +3004,7 @@ class Engine(
         This applies **only** to the built-in cache that is established
         via the :paramref:`_engine.create_engine.query_cache_size` parameter.
         It will not impact any dictionary caches that were passed via the
-        :paramref:`.Connection.execution_options.query_cache` parameter.
+        :paramref:`.Connection.execution_options.compiled_cache` parameter.
 
         .. versionadded:: 1.4
 
@@ -3025,12 +3043,10 @@ class Engine(
         insertmanyvalues_page_size: int = ...,
         schema_translate_map: Optional[SchemaTranslateMapType] = ...,
         **opt: Any,
-    ) -> OptionEngine:
-        ...
+    ) -> OptionEngine: ...
 
     @overload
-    def execution_options(self, **opt: Any) -> OptionEngine:
-        ...
+    def execution_options(self, **opt: Any) -> OptionEngine: ...
 
     def execution_options(self, **opt: Any) -> OptionEngine:
         """Return a new :class:`_engine.Engine` that will provide

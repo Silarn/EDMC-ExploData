@@ -1,5 +1,5 @@
 # util/compat.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import base64
 import dataclasses
+import hashlib
 import inspect
 import operator
 import platform
 import sys
 import typing
 from typing import Any
-from typing import AsyncGenerator
-from typing import Awaitable
 from typing import Callable
 from typing import Dict
 from typing import Iterable
@@ -101,22 +100,16 @@ def inspect_getfullargspec(func: Callable[..., Any]) -> FullArgSpec:
     )
 
 
-if py312:
-    # we are 95% certain this form of athrow works in former Python
-    # versions, however we are unable to get confirmation;
-    # see https://github.com/python/cpython/issues/105269 where have
-    # been unable to get a straight answer so far
-    def athrow(  # noqa
-        gen: AsyncGenerator[_T_co, Any], typ: Any, value: Any, traceback: Any
-    ) -> Awaitable[_T_co]:
-        return gen.athrow(value)
+if py39:
+    # python stubs don't have a public type for this. not worth
+    # making a protocol
+    def md5_not_for_security() -> Any:
+        return hashlib.md5(usedforsecurity=False)
 
 else:
 
-    def athrow(  # noqa
-        gen: AsyncGenerator[_T_co, Any], typ: Any, value: Any, traceback: Any
-    ) -> Awaitable[_T_co]:
-        return gen.athrow(typ, value, traceback)
+    def md5_not_for_security() -> Any:
+        return hashlib.md5()
 
 
 if typing.TYPE_CHECKING or py38:
@@ -160,7 +153,7 @@ else:
 
 def importlib_metadata_get(group):
     ep = importlib_metadata.entry_points()
-    if not typing.TYPE_CHECKING and hasattr(ep, "select"):
+    if typing.TYPE_CHECKING or hasattr(ep, "select"):
         return ep.select(group=group)
     else:
         return ep.get(group, ())

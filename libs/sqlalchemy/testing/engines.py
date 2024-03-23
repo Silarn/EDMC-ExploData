@@ -1,5 +1,5 @@
 # testing/engines.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -289,8 +289,7 @@ def testing_engine(
     options: Optional[Dict[str, Any]] = None,
     asyncio: Literal[False] = False,
     transfer_staticpool: bool = False,
-) -> Engine:
-    ...
+) -> Engine: ...
 
 
 @typing.overload
@@ -299,8 +298,7 @@ def testing_engine(
     options: Optional[Dict[str, Any]] = None,
     asyncio: Literal[True] = True,
     transfer_staticpool: bool = False,
-) -> AsyncEngine:
-    ...
+) -> AsyncEngine: ...
 
 
 def testing_engine(
@@ -370,7 +368,12 @@ def testing_engine(
                 True  # enable event blocks, helps with profiling
             )
 
-    if isinstance(engine.pool, pool.QueuePool):
+    if (
+        isinstance(engine.pool, pool.QueuePool)
+        and "pool" not in options
+        and "pool_timeout" not in options
+        and "max_overflow" not in options
+    ):
         engine.pool._timeout = 0
         engine.pool._max_overflow = 0
     if use_reaper:

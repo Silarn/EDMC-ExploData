@@ -1,3 +1,9 @@
+# testing/plugin/pytestplugin.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# <see AUTHORS file>
+#
+# This module is part of SQLAlchemy and is released under
+# the MIT License: https://www.opensource.org/licenses/mit-license.php
 # mypy: ignore-errors
 
 from __future__ import annotations
@@ -174,6 +180,12 @@ def pytest_sessionfinish(session):
         from pyannotate_runtime import collect_types
 
         collect_types.dump_stats(session.config.option.dump_pyannotate)
+
+
+def pytest_unconfigure(config):
+    from sqlalchemy.testing import asyncio
+
+    asyncio._shutdown()
 
 
 def pytest_collection_finish(session):
@@ -663,9 +675,9 @@ class PytestFixtureFunctions(plugin_base.FixtureFunctions):
         "i": lambda obj: obj,
         "r": repr,
         "s": str,
-        "n": lambda obj: obj.__name__
-        if hasattr(obj, "__name__")
-        else type(obj).__name__,
+        "n": lambda obj: (
+            obj.__name__ if hasattr(obj, "__name__") else type(obj).__name__
+        ),
     }
 
     def combinations(self, *arg_sets, **kw):

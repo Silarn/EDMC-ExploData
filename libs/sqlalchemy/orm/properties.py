@@ -1,5 +1,5 @@
 # orm/properties.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -25,6 +25,7 @@ from typing import Tuple
 from typing import Type
 from typing import TYPE_CHECKING
 from typing import TypeVar
+from typing import Union
 
 from . import attributes
 from . import strategy_options
@@ -57,6 +58,7 @@ from ..util.typing import de_optionalize_union_types
 from ..util.typing import is_fwd_ref
 from ..util.typing import is_optional_union
 from ..util.typing import is_pep593
+from ..util.typing import is_pep695
 from ..util.typing import is_union
 from ..util.typing import Self
 from ..util.typing import typing_get_args
@@ -428,8 +430,7 @@ class ColumnProperty(
 
         if TYPE_CHECKING:
 
-            def __clause_element__(self) -> NamedColumn[_PT]:
-                ...
+            def __clause_element__(self) -> NamedColumn[_PT]: ...
 
         def _memoized_method___clause_element__(
             self,
@@ -446,7 +447,7 @@ class ColumnProperty(
             try:
                 return ce.info  # type: ignore
             except AttributeError:
-                return self.prop.info  # type: ignore
+                return self.prop.info
 
         def _memoized_attr_expressions(self) -> Sequence[NamedColumn[Any]]:
             """The full sequence of columns referenced by this
@@ -475,13 +476,13 @@ class ColumnProperty(
         def operate(
             self, op: OperatorType, *other: Any, **kwargs: Any
         ) -> ColumnElement[Any]:
-            return op(self.__clause_element__(), *other, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
+            return op(self.__clause_element__(), *other, **kwargs)  # type: ignore[no-any-return]  # noqa: E501
 
         def reverse_operate(
             self, op: OperatorType, other: Any, **kwargs: Any
         ) -> ColumnElement[Any]:
             col = self.__clause_element__()
-            return op(col._bind_param(op, other), col, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
+            return op(col._bind_param(op, other), col, **kwargs)  # type: ignore[no-any-return]  # noqa: E501
 
     def __str__(self) -> str:
         if not self.parent or not self.key:
@@ -542,7 +543,7 @@ class MappedColumn(
         "_use_existing_column",
     )
 
-    deferred: bool
+    deferred: Union[_NoArg, bool]
     deferred_raiseload: bool
     deferred_group: Optional[str]
 
@@ -557,17 +558,15 @@ class MappedColumn(
 
         self._use_existing_column = kw.pop("use_existing_column", False)
 
-        self._has_dataclass_arguments = False
-
-        if attr_opts is not None and attr_opts != _DEFAULT_ATTRIBUTE_OPTIONS:
-            if attr_opts.dataclasses_default_factory is not _NoArg.NO_ARG:
-                self._has_dataclass_arguments = True
-
-            elif (
-                attr_opts.dataclasses_init is not _NoArg.NO_ARG
-                or attr_opts.dataclasses_repr is not _NoArg.NO_ARG
-            ):
-                self._has_dataclass_arguments = True
+        self._has_dataclass_arguments = (
+            attr_opts is not None
+            and attr_opts != _DEFAULT_ATTRIBUTE_OPTIONS
+            and any(
+                attr_opts[i] is not _NoArg.NO_ARG
+                for i, attr in enumerate(attr_opts._fields)
+                if attr != "dataclasses_default"
+            )
+        )
 
         insert_default = kw.pop("insert_default", _NoArg.NO_ARG)
         self._has_insert_default = insert_default is not _NoArg.NO_ARG
@@ -580,12 +579,9 @@ class MappedColumn(
         self.deferred_group = kw.pop("deferred_group", None)
         self.deferred_raiseload = kw.pop("deferred_raiseload", None)
         self.deferred = kw.pop("deferred", _NoArg.NO_ARG)
-        if self.deferred is _NoArg.NO_ARG:
-            self.deferred = bool(
-                self.deferred_group or self.deferred_raiseload
-            )
         self.active_history = kw.pop("active_history", False)
-        self._sort_order = kw.pop("sort_order", 0)
+
+        self._sort_order = kw.pop("sort_order", _NoArg.NO_ARG)
         self.column = cast("Column[_T]", Column(*arg, **kw))
         self.foreign_keys = self.column.foreign_keys
         self._has_nullable = "nullable" in kw and kw.get("nullable") not in (
@@ -617,10 +613,16 @@ class MappedColumn(
 
     @property
     def mapper_property_to_assign(self) -> Optional[MapperProperty[_T]]:
-        if self.deferred or self.active_history:
+        effective_deferred = self.deferred
+        if effective_deferred is _NoArg.NO_ARG:
+            effective_deferred = bool(
+                self.deferred_group or self.deferred_raiseload
+            )
+
+        if effective_deferred or self.active_history:
             return ColumnProperty(
                 self.column,
-                deferred=self.deferred,
+                deferred=effective_deferred,
                 group=self.deferred_group,
                 raiseload=self.deferred_raiseload,
                 attribute_options=self._attribute_options,
@@ -631,7 +633,16 @@ class MappedColumn(
 
     @property
     def columns_to_assign(self) -> List[Tuple[Column[Any], int]]:
-        return [(self.column, self._sort_order)]
+        return [
+            (
+                self.column,
+                (
+                    self._sort_order
+                    if self._sort_order is not _NoArg.NO_ARG
+                    else 0
+                ),
+            )
+        ]
 
     def __clause_element__(self) -> Column[_T]:
         return self.column
@@ -639,13 +650,13 @@ class MappedColumn(
     def operate(
         self, op: OperatorType, *other: Any, **kwargs: Any
     ) -> ColumnElement[Any]:
-        return op(self.__clause_element__(), *other, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
+        return op(self.__clause_element__(), *other, **kwargs)  # type: ignore[no-any-return]  # noqa: E501
 
     def reverse_operate(
         self, op: OperatorType, other: Any, **kwargs: Any
     ) -> ColumnElement[Any]:
         col = self.__clause_element__()
-        return op(col._bind_param(op, other), col, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
+        return op(col._bind_param(op, other), col, **kwargs)  # type: ignore[no-any-return]  # noqa: E501
 
     def found_in_pep593_annotated(self) -> Any:
         # return a blank mapped_column().  This mapped_column()'s
@@ -750,6 +761,11 @@ class MappedColumn(
 
         use_args_from = None
 
+        our_original_type = our_type
+
+        if is_pep695(our_type):
+            our_type = our_type.__value__
+
         if is_pep593(our_type):
             our_type_is_pep593 = True
 
@@ -779,13 +795,72 @@ class MappedColumn(
             use_args_from.column._merge(self.column)
             sqltype = self.column.type
 
+            if (
+                use_args_from.deferred is not _NoArg.NO_ARG
+                and self.deferred is _NoArg.NO_ARG
+            ):
+                self.deferred = use_args_from.deferred
+
+            if (
+                use_args_from.deferred_group is not None
+                and self.deferred_group is None
+            ):
+                self.deferred_group = use_args_from.deferred_group
+
+            if (
+                use_args_from.deferred_raiseload is not None
+                and self.deferred_raiseload is None
+            ):
+                self.deferred_raiseload = use_args_from.deferred_raiseload
+
+            if (
+                use_args_from._use_existing_column
+                and not self._use_existing_column
+            ):
+                self._use_existing_column = True
+
+            if use_args_from.active_history:
+                self.active_history = use_args_from.active_history
+
+            if (
+                use_args_from._sort_order is not None
+                and self._sort_order is _NoArg.NO_ARG
+            ):
+                self._sort_order = use_args_from._sort_order
+
+            if (
+                use_args_from.column.key is not None
+                or use_args_from.column.name is not None
+            ):
+                util.warn_deprecated(
+                    "Can't use the 'key' or 'name' arguments in "
+                    "Annotated with mapped_column(); this will be ignored",
+                    "2.0.22",
+                )
+
+            if use_args_from._has_dataclass_arguments:
+                for idx, arg in enumerate(
+                    use_args_from._attribute_options._fields
+                ):
+                    if (
+                        use_args_from._attribute_options[idx]
+                        is not _NoArg.NO_ARG
+                    ):
+                        arg = arg.replace("dataclasses_", "")
+                        util.warn_deprecated(
+                            f"Argument '{arg}' is a dataclass argument and "
+                            "cannot be specified within a mapped_column() "
+                            "bundled inside of an Annotated object",
+                            "2.0.22",
+                        )
+
         if sqltype._isnull and not self.column.foreign_keys:
             new_sqltype = None
 
             if our_type_is_pep593:
-                checks = [our_type, raw_pep_593_type]
+                checks = [our_original_type, raw_pep_593_type]
             else:
-                checks = [our_type]
+                checks = [our_original_type]
 
             for check_type in checks:
                 new_sqltype = registry._resolve_type(check_type)

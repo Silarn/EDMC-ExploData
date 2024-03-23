@@ -1,5 +1,5 @@
-# orm/collections.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# orm/mapped_collection.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -117,9 +117,7 @@ class _SerializableColumnGetterV2(_PlainColumnGetter[_KT]):
         return self.__class__, (self.colkeys,)
 
     @classmethod
-    def _reduce_from_cols(
-        cls, cols: Sequence[ColumnElement[_KT]]
-    ) -> Tuple[
+    def _reduce_from_cols(cls, cols: Sequence[ColumnElement[_KT]]) -> Tuple[
         Type[_SerializableColumnGetterV2[_KT]],
         Tuple[Sequence[Tuple[Optional[str], Optional[str]]]],
     ]:
@@ -231,7 +229,7 @@ class _AttrGetter:
 
 def attribute_keyed_dict(
     attr_name: str, *, ignore_unpopulated_attribute: bool = False
-) -> Type[KeyFuncDict[_KT, _KT]]:
+) -> Type[KeyFuncDict[Any, Any]]:
     """A dictionary-based collection type with attribute-based keying.
 
     .. versionchanged:: 2.0 Renamed :data:`.attribute_mapped_collection` to

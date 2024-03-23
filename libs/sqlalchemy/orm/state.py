@@ -1,5 +1,5 @@
 # orm/state.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -78,8 +78,7 @@ if not TYPE_CHECKING:
 
 
 class _InstanceDictProto(Protocol):
-    def __call__(self) -> Optional[IdentityMap]:
-        ...
+    def __call__(self) -> Optional[IdentityMap]: ...
 
 
 class _InstallLoaderCallableProto(Protocol[_O]):
@@ -94,8 +93,7 @@ class _InstallLoaderCallableProto(Protocol[_O]):
 
     def __call__(
         self, state: InstanceState[_O], dict_: _InstanceDict, row: Row[Any]
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @inspection._self_inspects
@@ -617,8 +615,8 @@ class InstanceState(interfaces.InspectionAttrInfo, Generic[_O]):
             self.class_ = state_dict["class_"]
 
         self.committed_state = state_dict.get("committed_state", {})
-        self._pending_mutations = state_dict.get("_pending_mutations", {})  # type: ignore  # noqa E501
-        self.parents = state_dict.get("parents", {})  # type: ignore
+        self._pending_mutations = state_dict.get("_pending_mutations", {})
+        self.parents = state_dict.get("parents", {})
         self.modified = state_dict.get("modified", False)
         self.expired = state_dict.get("expired", False)
         if "info" in state_dict:

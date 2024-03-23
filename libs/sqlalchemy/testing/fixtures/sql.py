@@ -1,5 +1,5 @@
 # testing/fixtures/sql.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -459,6 +459,10 @@ def insertmanyvalues_fixture(
         # by not having the other methods we assert that those aren't being
         # used
 
+        @property
+        def description(self):
+            return self.cursor.description
+
         def fetchall(self):
             rows = self.cursor.fetchall()
             rows = list(rows)
@@ -478,10 +482,7 @@ def insertmanyvalues_fixture(
 
             yield batch
 
-    def _exec_insertmany_context(
-        dialect,
-        context,
-    ):
+    def _exec_insertmany_context(dialect, context):
         with mock.patch.object(
             dialect,
             "_deliver_insertmanyvalues_batches",

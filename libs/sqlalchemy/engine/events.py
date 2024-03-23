@@ -1,5 +1,5 @@
-# sqlalchemy/engine/events.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# engine/events.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -131,7 +131,7 @@ class ConnectionEvents(event.Events[ConnectionEventsTarget]):
         if default_dispatch is None and hasattr(
             target, "_no_async_engine_events"
         ):
-            target._no_async_engine_events()  # type: ignore
+            target._no_async_engine_events()
 
         return default_dispatch
 
@@ -640,7 +640,7 @@ class DialectEvents(event.Events[Dialect]):
     _dispatch_target = Dialect
 
     @classmethod
-    def _listen(  # type: ignore
+    def _listen(
         cls,
         event_key: event._EventKey[Dialect],
         *,

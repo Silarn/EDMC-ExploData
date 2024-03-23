@@ -1,5 +1,5 @@
 # ext/mutable.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -378,6 +378,7 @@ from weakref import WeakKeyDictionary
 from .. import event
 from .. import inspect
 from .. import types
+from .. import util
 from ..orm import Mapper
 from ..orm._typing import _ExternalEntityType
 from ..orm._typing import _O
@@ -799,15 +800,12 @@ class MutableDict(Mutable, Dict[_KT, _VT]):
         @overload
         def setdefault(
             self: MutableDict[_KT, Optional[_T]], key: _KT, value: None = None
-        ) -> Optional[_T]:
-            ...
+        ) -> Optional[_T]: ...
 
         @overload
-        def setdefault(self, key: _KT, value: _VT) -> _VT:
-            ...
+        def setdefault(self, key: _KT, value: _VT) -> _VT: ...
 
-        def setdefault(self, key: _KT, value: object = None) -> object:
-            ...
+        def setdefault(self, key: _KT, value: object = None) -> object: ...
 
     else:
 
@@ -828,17 +826,14 @@ class MutableDict(Mutable, Dict[_KT, _VT]):
     if TYPE_CHECKING:
 
         @overload
-        def pop(self, __key: _KT) -> _VT:
-            ...
+        def pop(self, __key: _KT) -> _VT: ...
 
         @overload
-        def pop(self, __key: _KT, __default: _VT | _T) -> _VT | _T:
-            ...
+        def pop(self, __key: _KT, __default: _VT | _T) -> _VT | _T: ...
 
         def pop(
             self, __key: _KT, __default: _VT | _T | None = None
-        ) -> _VT | _T:
-            ...
+        ) -> _VT | _T: ...
 
     else:
 
@@ -909,10 +904,10 @@ class MutableList(Mutable, List[_T]):
         self[:] = state
 
     def is_scalar(self, value: _T | Iterable[_T]) -> TypeGuard[_T]:
-        return not isinstance(value, Iterable)
+        return not util.is_non_string_iterable(value)
 
     def is_iterable(self, value: _T | Iterable[_T]) -> TypeGuard[Iterable[_T]]:
-        return isinstance(value, Iterable)
+        return util.is_non_string_iterable(value)
 
     def __setitem__(
         self, index: SupportsIndex | slice, value: _T | Iterable[_T]

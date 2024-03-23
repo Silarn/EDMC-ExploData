@@ -1,5 +1,5 @@
 # sql/sqltypes.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -80,7 +80,6 @@ _TE = TypeVar("_TE", bound="TypeEngine[Any]")
 
 
 class HasExpressionLookup(TypeEngineMixin):
-
     """Mixin expression adaptations based on lookup tables.
 
     These rules are currently used by the numeric, integer and date types
@@ -119,7 +118,6 @@ class HasExpressionLookup(TypeEngineMixin):
 
 
 class Concatenable(TypeEngineMixin):
-
     """A mixin that marks a type as supporting 'concatenation',
     typically strings."""
 
@@ -168,7 +166,6 @@ class Indexable(TypeEngineMixin):
 
 
 class String(Concatenable, TypeEngine[str]):
-
     """The base for all string and character types.
 
     In SQL, corresponds to VARCHAR.
@@ -255,7 +252,6 @@ class String(Concatenable, TypeEngine[str]):
 
 
 class Text(String):
-
     """A variably sized string type.
 
     In SQL, usually corresponds to CLOB or TEXT.  In general, TEXT objects
@@ -268,7 +264,6 @@ class Text(String):
 
 
 class Unicode(String):
-
     """A variable length Unicode string type.
 
     The :class:`.Unicode` type is a :class:`.String` subclass that assumes
@@ -311,18 +306,8 @@ class Unicode(String):
 
     __visit_name__ = "unicode"
 
-    def __init__(self, length=None, **kwargs):
-        """
-        Create a :class:`.Unicode` object.
-
-        Parameters are the same as that of :class:`.String`.
-
-        """
-        super().__init__(length=length, **kwargs)
-
 
 class UnicodeText(Text):
-
     """An unbounded-length Unicode string type.
 
     See :class:`.Unicode` for details on the unicode
@@ -336,18 +321,8 @@ class UnicodeText(Text):
 
     __visit_name__ = "unicode_text"
 
-    def __init__(self, length=None, **kwargs):
-        """
-        Create a Unicode-converting Text type.
-
-        Parameters are the same as that of :class:`_expression.TextClause`.
-
-        """
-        super().__init__(length=length, **kwargs)
-
 
 class Integer(HasExpressionLookup, TypeEngine[int]):
-
     """A type for ``int`` integers."""
 
     __visit_name__ = "integer"
@@ -355,8 +330,7 @@ class Integer(HasExpressionLookup, TypeEngine[int]):
     if TYPE_CHECKING:
 
         @util.ro_memoized_property
-        def _type_affinity(self) -> Type[Integer]:
-            ...
+        def _type_affinity(self) -> Type[Integer]: ...
 
     def get_dbapi_type(self, dbapi):
         return dbapi.NUMBER
@@ -397,7 +371,6 @@ class Integer(HasExpressionLookup, TypeEngine[int]):
 
 
 class SmallInteger(Integer):
-
     """A type for smaller ``int`` integers.
 
     Typically generates a ``SMALLINT`` in DDL, and otherwise acts like
@@ -409,7 +382,6 @@ class SmallInteger(Integer):
 
 
 class BigInteger(Integer):
-
     """A type for bigger ``int`` integers.
 
     Typically generates a ``BIGINT`` in DDL, and otherwise acts like
@@ -424,7 +396,6 @@ _N = TypeVar("_N", bound=Union[decimal.Decimal, float])
 
 
 class Numeric(HasExpressionLookup, TypeEngine[_N]):
-
     """Base for non-integer numeric types, such as
     ``NUMERIC``, ``FLOAT``, ``DECIMAL``, and other variants.
 
@@ -461,8 +432,7 @@ class Numeric(HasExpressionLookup, TypeEngine[_N]):
     if TYPE_CHECKING:
 
         @util.ro_memoized_property
-        def _type_affinity(self) -> Type[Numeric[_N]]:
-            ...
+        def _type_affinity(self) -> Type[Numeric[_N]]: ...
 
     _default_decimal_return_scale = 10
 
@@ -473,8 +443,7 @@ class Numeric(HasExpressionLookup, TypeEngine[_N]):
         scale: Optional[int] = ...,
         decimal_return_scale: Optional[int] = ...,
         asdecimal: Literal[True] = ...,
-    ):
-        ...
+    ): ...
 
     @overload
     def __init__(
@@ -483,8 +452,7 @@ class Numeric(HasExpressionLookup, TypeEngine[_N]):
         scale: Optional[int] = ...,
         decimal_return_scale: Optional[int] = ...,
         asdecimal: Literal[False] = ...,
-    ):
-        ...
+    ): ...
 
     def __init__(
         self,
@@ -580,9 +548,11 @@ class Numeric(HasExpressionLookup, TypeEngine[_N]):
                 # we're a "numeric", DBAPI returns floats, convert.
                 return processors.to_decimal_processor_factory(
                     decimal.Decimal,
-                    self.scale
-                    if self.scale is not None
-                    else self._default_decimal_return_scale,
+                    (
+                        self.scale
+                        if self.scale is not None
+                        else self._default_decimal_return_scale
+                    ),
                 )
         else:
             if dialect.supports_native_decimal:
@@ -608,14 +578,21 @@ class Numeric(HasExpressionLookup, TypeEngine[_N]):
 
 
 class Float(Numeric[_N]):
-
     """Type representing floating point types, such as ``FLOAT`` or ``REAL``.
 
     This type returns Python ``float`` objects by default, unless the
-    :paramref:`.Float.asdecimal` flag is set to True, in which case they
+    :paramref:`.Float.asdecimal` flag is set to ``True``, in which case they
     are coerced to ``decimal.Decimal`` objects.
 
-
+    When a :paramref:`.Float.precision` is not provided in a
+    :class:`_types.Float` type some backend may compile this type as
+    an 8 bytes / 64 bit float datatype. To use a 4 bytes / 32 bit float
+    datatype a precision <= 24 can usually be provided or the
+    :class:`_types.REAL` type can be used.
+    This is known to be the case in the PostgreSQL and MSSQL dialects
+    that render the type as ``FLOAT`` that's in both an alias of
+    ``DOUBLE PRECISION``. Other third party dialects may have similar
+    behavior.
     """
 
     __visit_name__ = "float"
@@ -628,8 +605,7 @@ class Float(Numeric[_N]):
         precision: Optional[int] = ...,
         asdecimal: Literal[False] = ...,
         decimal_return_scale: Optional[int] = ...,
-    ):
-        ...
+    ): ...
 
     @overload
     def __init__(
@@ -637,8 +613,7 @@ class Float(Numeric[_N]):
         precision: Optional[int] = ...,
         asdecimal: Literal[True] = ...,
         decimal_return_scale: Optional[int] = ...,
-    ):
-        ...
+    ): ...
 
     def __init__(
         self: Float[_N],
@@ -733,16 +708,12 @@ class _RenderISO8601NoT:
         if _portion is not None:
 
             def process(value):
-                if value is not None:
-                    value = f"""'{value.isoformat().split("T")[_portion]}'"""
-                return value
+                return f"""'{value.isoformat().split("T")[_portion]}'"""
 
         else:
 
             def process(value):
-                if value is not None:
-                    value = f"""'{value.isoformat().replace("T", " ")}'"""
-                return value
+                return f"""'{value.isoformat().replace("T", " ")}'"""
 
         return process
 
@@ -750,7 +721,6 @@ class _RenderISO8601NoT:
 class DateTime(
     _RenderISO8601NoT, HasExpressionLookup, TypeEngine[dt.datetime]
 ):
-
     """A type for ``datetime.datetime()`` objects.
 
     Date and time types return objects from the Python ``datetime``
@@ -814,7 +784,6 @@ class DateTime(
 
 
 class Date(_RenderISO8601NoT, HasExpressionLookup, TypeEngine[dt.date]):
-
     """A type for ``datetime.date()`` objects."""
 
     __visit_name__ = "date"
@@ -855,7 +824,6 @@ class Date(_RenderISO8601NoT, HasExpressionLookup, TypeEngine[dt.date]):
 
 
 class Time(_RenderISO8601NoT, HasExpressionLookup, TypeEngine[dt.time]):
-
     """A type for ``datetime.time()`` objects."""
 
     __visit_name__ = "time"
@@ -892,7 +860,6 @@ class Time(_RenderISO8601NoT, HasExpressionLookup, TypeEngine[dt.time]):
 
 
 class _Binary(TypeEngine[bytes]):
-
     """Define base behavior for binary types."""
 
     def __init__(self, length: Optional[int] = None):
@@ -956,7 +923,6 @@ class _Binary(TypeEngine[bytes]):
 
 
 class LargeBinary(_Binary):
-
     """A type for large binary byte data.
 
     The :class:`.LargeBinary` type corresponds to a large and/or unlengthed
@@ -980,7 +946,6 @@ class LargeBinary(_Binary):
 
 
 class SchemaType(SchemaEventTarget, TypeEngineMixin):
-
     """Add capabilities to a type which allow for schema-level DDL to be
     associated with a type.
 
@@ -1118,12 +1083,12 @@ class SchemaType(SchemaEventTarget, TypeEngineMixin):
         )
 
     @overload
-    def adapt(self, cls: Type[_TE], **kw: Any) -> _TE:
-        ...
+    def adapt(self, cls: Type[_TE], **kw: Any) -> _TE: ...
 
     @overload
-    def adapt(self, cls: Type[TypeEngineMixin], **kw: Any) -> TypeEngine[Any]:
-        ...
+    def adapt(
+        self, cls: Type[TypeEngineMixin], **kw: Any
+    ) -> TypeEngine[Any]: ...
 
     def adapt(
         self, cls: Type[Union[TypeEngine[Any], TypeEngineMixin]], **kw: Any
@@ -1395,7 +1360,10 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
            compliant enumerated type, which should then return a list of string
            values to be persisted. This allows for alternate usages such as
            using the string value of an enum to be persisted to the database
-           instead of its name.
+           instead of its name. The callable must return the values to be
+           persisted in the same order as iterating through the Enum's
+           ``__member__`` attribute. For example
+           ``lambda x: [i.value for i in x]``.
 
            .. versionadded:: 1.2.3
 
@@ -1451,7 +1419,11 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
             self._default_length = length = 0
 
         if length_arg is not NO_ARG:
-            if not _disable_warnings and length_arg < length:
+            if (
+                not _disable_warnings
+                and length_arg is not None
+                and length_arg < length
+            ):
                 raise ValueError(
                     "When provided, length must be larger or equal"
                     " than the length of the longest enum value. %s < %s"
@@ -1658,14 +1630,14 @@ class Enum(String, SchemaType, Emulated, TypeEngine[Union[str, enum.Enum]]):
         )
 
     def as_generic(self, allow_nulltype=False):
-        if hasattr(self, "enums"):
+        try:
             args = self.enums
-        else:
+        except AttributeError:
             raise NotImplementedError(
                 "TypeEngine.as_generic() heuristic "
                 "is undefined for types that inherit Enum but do not have "
                 "an `enums` attribute."
-            )
+            ) from None
 
         return util.constructor_copy(
             self, self._generic_type_affinity, *args, _disable_warnings=True
@@ -1876,7 +1848,6 @@ class PickleType(TypeDecorator[object]):
 
 
 class Boolean(SchemaType, Emulated, TypeEngine[bool]):
-
     """A bool datatype.
 
     :class:`.Boolean` typically uses BOOLEAN or SMALLINT on the DDL side,
@@ -2034,12 +2005,11 @@ class _AbstractInterval(HasExpressionLookup, TypeEngine[dt.timedelta]):
 
 
 class Interval(Emulated, _AbstractInterval, TypeDecorator[dt.timedelta]):
-
     """A type for ``datetime.timedelta()`` objects.
 
     The Interval type deals with ``datetime.timedelta`` objects.  In
-    PostgreSQL, the native ``INTERVAL`` type is used; for others, the
-    value is stored as a date which is relative to the "epoch"
+    PostgreSQL and Oracle, the native ``INTERVAL`` type is used; for others,
+    the value is stored as a date which is relative to the "epoch"
     (Jan. 1, 1970).
 
     Note that the ``Interval`` type does not currently provide date arithmetic
@@ -2470,6 +2440,9 @@ class JSON(Indexable, TypeEngine[Any]):
                     value = int_processor(value)
                 elif string_processor and isinstance(value, str):
                     value = string_processor(value)
+                else:
+                    raise NotImplementedError()
+
                 return value
 
             return process
@@ -2532,9 +2505,11 @@ class JSON(Indexable, TypeEngine[Any]):
                     index,
                     expr=self.expr,
                     operator=operators.json_getitem_op,
-                    bindparam_type=JSON.JSONIntIndexType
-                    if isinstance(index, int)
-                    else JSON.JSONStrIndexType,
+                    bindparam_type=(
+                        JSON.JSONIntIndexType
+                        if isinstance(index, int)
+                        else JSON.JSONStrIndexType
+                    ),
                 )
                 operator = operators.json_getitem_op
 
@@ -2791,22 +2766,22 @@ class ARRAY(
     dimension parameter will generally assume single-dimensional behaviors.
 
     SQL expressions of type :class:`_types.ARRAY` have support for "index" and
-    "slice" behavior.  The Python ``[]`` operator works normally here, given
-    integer indexes or slices.  Arrays default to 1-based indexing.
-    The operator produces binary expression
+    "slice" behavior.  The ``[]`` operator produces expression
     constructs which will produce the appropriate SQL, both for
     SELECT statements::
 
         select(mytable.c.data[5], mytable.c.data[2:7])
 
     as well as UPDATE statements when the :meth:`_expression.Update.values`
-    method
-    is used::
+    method is used::
 
         mytable.update().values({
             mytable.c.data[5]: 7,
             mytable.c.data[2:7]: [1, 2, 3]
         })
+
+    Indexed access is one-based by default;
+    for zero-based index conversion, set :paramref:`_types.ARRAY.zero_indexes`.
 
     The :class:`_types.ARRAY` type also provides for the operators
     :meth:`.types.ARRAY.Comparator.any` and
@@ -2851,160 +2826,6 @@ class ARRAY(
     zero_indexes = False
     """If True, Python zero-based indexes should be interpreted as one-based
     on the SQL expression side."""
-
-    class Comparator(
-        Indexable.Comparator[Sequence[Any]],
-        Concatenable.Comparator[Sequence[Any]],
-    ):
-
-        """Define comparison operations for :class:`_types.ARRAY`.
-
-        More operators are available on the dialect-specific form
-        of this type.  See :class:`.postgresql.ARRAY.Comparator`.
-
-        """
-
-        __slots__ = ()
-
-        type: ARRAY
-
-        def _setup_getitem(self, index):
-            arr_type = self.type
-
-            return_type: TypeEngine[Any]
-
-            if isinstance(index, slice):
-                return_type = arr_type
-                if arr_type.zero_indexes:
-                    index = slice(index.start + 1, index.stop + 1, index.step)
-                slice_ = Slice(
-                    index.start, index.stop, index.step, _name=self.expr.key
-                )
-                return operators.getitem, slice_, return_type
-            else:
-                if arr_type.zero_indexes:
-                    index += 1
-                if arr_type.dimensions is None or arr_type.dimensions == 1:
-                    return_type = arr_type.item_type
-                else:
-                    adapt_kw = {"dimensions": arr_type.dimensions - 1}
-                    return_type = arr_type.adapt(
-                        arr_type.__class__, **adapt_kw
-                    )
-
-                return operators.getitem, index, return_type
-
-        def contains(self, *arg, **kw):
-            raise NotImplementedError(
-                "ARRAY.contains() not implemented for the base "
-                "ARRAY type; please use the dialect-specific ARRAY type"
-            )
-
-        @util.preload_module("sqlalchemy.sql.elements")
-        def any(self, other, operator=None):
-            """Return ``other operator ANY (array)`` clause.
-
-            .. note:: This method is an :class:`_types.ARRAY` - specific
-                construct that is now superseded by the :func:`_sql.any_`
-                function, which features a different calling style. The
-                :func:`_sql.any_` function is also mirrored at the method level
-                via the :meth:`_sql.ColumnOperators.any_` method.
-
-            Usage of array-specific :meth:`_types.ARRAY.Comparator.any`
-            is as follows::
-
-                from sqlalchemy.sql import operators
-
-                conn.execute(
-                    select(table.c.data).where(
-                            table.c.data.any(7, operator=operators.lt)
-                        )
-                )
-
-            :param other: expression to be compared
-            :param operator: an operator object from the
-             :mod:`sqlalchemy.sql.operators`
-             package, defaults to :func:`.operators.eq`.
-
-            .. seealso::
-
-                :func:`_expression.any_`
-
-                :meth:`.types.ARRAY.Comparator.all`
-
-            """
-            elements = util.preloaded.sql_elements
-            operator = operator if operator else operators.eq
-
-            arr_type = self.type
-
-            # send plain BinaryExpression so that negate remains at None,
-            # leading to NOT expr for negation.
-            return elements.BinaryExpression(
-                coercions.expect(
-                    roles.BinaryElementRole,
-                    element=other,
-                    operator=operator,
-                    expr=self.expr,
-                    bindparam_type=arr_type.item_type,
-                ),
-                elements.CollectionAggregate._create_any(self.expr),
-                operator,
-            )
-
-        @util.preload_module("sqlalchemy.sql.elements")
-        def all(self, other, operator=None):
-            """Return ``other operator ALL (array)`` clause.
-
-            .. note:: This method is an :class:`_types.ARRAY` - specific
-                construct that is now superseded by the :func:`_sql.any_`
-                function, which features a different calling style. The
-                :func:`_sql.any_` function is also mirrored at the method level
-                via the :meth:`_sql.ColumnOperators.any_` method.
-
-            Usage of array-specific :meth:`_types.ARRAY.Comparator.all`
-            is as follows::
-
-                from sqlalchemy.sql import operators
-
-                conn.execute(
-                    select(table.c.data).where(
-                            table.c.data.all(7, operator=operators.lt)
-                        )
-                )
-
-            :param other: expression to be compared
-            :param operator: an operator object from the
-             :mod:`sqlalchemy.sql.operators`
-             package, defaults to :func:`.operators.eq`.
-
-            .. seealso::
-
-                :func:`_expression.all_`
-
-                :meth:`.types.ARRAY.Comparator.any`
-
-            """
-            elements = util.preloaded.sql_elements
-            operator = operator if operator else operators.eq
-
-            arr_type = self.type
-
-            # send plain BinaryExpression so that negate remains at None,
-            # leading to NOT expr for negation.
-            return elements.BinaryExpression(
-                coercions.expect(
-                    roles.BinaryElementRole,
-                    element=other,
-                    operator=operator,
-                    expr=self.expr,
-                    bindparam_type=arr_type.item_type,
-                ),
-                elements.CollectionAggregate._create_all(self.expr),
-                operator,
-            )
-
-    comparator_factory = Comparator
 
     def __init__(
         self,
@@ -3055,6 +2876,160 @@ class ARRAY(
         self.as_tuple = as_tuple
         self.dimensions = dimensions
         self.zero_indexes = zero_indexes
+
+    class Comparator(
+        Indexable.Comparator[Sequence[Any]],
+        Concatenable.Comparator[Sequence[Any]],
+    ):
+        """Define comparison operations for :class:`_types.ARRAY`.
+
+        More operators are available on the dialect-specific form
+        of this type.  See :class:`.postgresql.ARRAY.Comparator`.
+
+        """
+
+        __slots__ = ()
+
+        type: ARRAY
+
+        def _setup_getitem(self, index):
+            arr_type = self.type
+
+            return_type: TypeEngine[Any]
+
+            if isinstance(index, slice):
+                return_type = arr_type
+                if arr_type.zero_indexes:
+                    index = slice(index.start + 1, index.stop + 1, index.step)
+                slice_ = Slice(
+                    index.start, index.stop, index.step, _name=self.expr.key
+                )
+                return operators.getitem, slice_, return_type
+            else:
+                if arr_type.zero_indexes:
+                    index += 1
+                if arr_type.dimensions is None or arr_type.dimensions == 1:
+                    return_type = arr_type.item_type
+                else:
+                    adapt_kw = {"dimensions": arr_type.dimensions - 1}
+                    return_type = arr_type.adapt(
+                        arr_type.__class__, **adapt_kw
+                    )
+
+                return operators.getitem, index, return_type
+
+        def contains(self, *arg, **kw):
+            """``ARRAY.contains()`` not implemented for the base ARRAY type.
+            Use the dialect-specific ARRAY type.
+
+            .. seealso::
+
+                :class:`_postgresql.ARRAY` - PostgreSQL specific version.
+            """
+            raise NotImplementedError(
+                "ARRAY.contains() not implemented for the base "
+                "ARRAY type; please use the dialect-specific ARRAY type"
+            )
+
+        @util.preload_module("sqlalchemy.sql.elements")
+        def any(self, other, operator=None):
+            """Return ``other operator ANY (array)`` clause.
+
+            .. legacy:: This method is an :class:`_types.ARRAY` - specific
+                construct that is now superseded by the :func:`_sql.any_`
+                function, which features a different calling style. The
+                :func:`_sql.any_` function is also mirrored at the method level
+                via the :meth:`_sql.ColumnOperators.any_` method.
+
+            Usage of array-specific :meth:`_types.ARRAY.Comparator.any`
+            is as follows::
+
+                from sqlalchemy.sql import operators
+
+                conn.execute(
+                    select(table.c.data).where(
+                            table.c.data.any(7, operator=operators.lt)
+                        )
+                )
+
+            :param other: expression to be compared
+            :param operator: an operator object from the
+             :mod:`sqlalchemy.sql.operators`
+             package, defaults to :func:`.operators.eq`.
+
+            .. seealso::
+
+                :func:`_expression.any_`
+
+                :meth:`.types.ARRAY.Comparator.all`
+
+            """
+            elements = util.preloaded.sql_elements
+            operator = operator if operator else operators.eq
+
+            arr_type = self.type
+
+            return elements.CollectionAggregate._create_any(self.expr).operate(
+                operators.mirror(operator),
+                coercions.expect(
+                    roles.BinaryElementRole,
+                    element=other,
+                    operator=operator,
+                    expr=self.expr,
+                    bindparam_type=arr_type.item_type,
+                ),
+            )
+
+        @util.preload_module("sqlalchemy.sql.elements")
+        def all(self, other, operator=None):
+            """Return ``other operator ALL (array)`` clause.
+
+            .. legacy:: This method is an :class:`_types.ARRAY` - specific
+                construct that is now superseded by the :func:`_sql.all_`
+                function, which features a different calling style. The
+                :func:`_sql.all_` function is also mirrored at the method level
+                via the :meth:`_sql.ColumnOperators.all_` method.
+
+            Usage of array-specific :meth:`_types.ARRAY.Comparator.all`
+            is as follows::
+
+                from sqlalchemy.sql import operators
+
+                conn.execute(
+                    select(table.c.data).where(
+                            table.c.data.all(7, operator=operators.lt)
+                        )
+                )
+
+            :param other: expression to be compared
+            :param operator: an operator object from the
+             :mod:`sqlalchemy.sql.operators`
+             package, defaults to :func:`.operators.eq`.
+
+            .. seealso::
+
+                :func:`_expression.all_`
+
+                :meth:`.types.ARRAY.Comparator.any`
+
+            """
+            elements = util.preloaded.sql_elements
+            operator = operator if operator else operators.eq
+
+            arr_type = self.type
+
+            return elements.CollectionAggregate._create_all(self.expr).operate(
+                operators.mirror(operator),
+                coercions.expect(
+                    roles.BinaryElementRole,
+                    element=other,
+                    operator=operator,
+                    expr=self.expr,
+                    bindparam_type=arr_type.item_type,
+                ),
+            )
+
+    comparator_factory = Comparator
 
     @property
     def hashable(self):
@@ -3130,14 +3105,16 @@ class ARRAY(
                 return collection_callable(arr)
         else:
             return collection_callable(
-                self._apply_item_processor(
-                    x,
-                    itemproc,
-                    dim - 1 if dim is not None else None,
-                    collection_callable,
+                (
+                    self._apply_item_processor(
+                        x,
+                        itemproc,
+                        dim - 1 if dim is not None else None,
+                        collection_callable,
+                    )
+                    if x is not None
+                    else None
                 )
-                if x is not None
-                else None
                 for x in arr
             )
 
@@ -3188,7 +3165,6 @@ class TupleType(TypeEngine[Tuple[Any, ...]]):
 
 
 class REAL(Float[_N]):
-
     """The SQL REAL type.
 
     .. seealso::
@@ -3201,7 +3177,6 @@ class REAL(Float[_N]):
 
 
 class FLOAT(Float[_N]):
-
     """The SQL FLOAT type.
 
     .. seealso::
@@ -3242,7 +3217,6 @@ class DOUBLE_PRECISION(Double[_N]):
 
 
 class NUMERIC(Numeric[_N]):
-
     """The SQL NUMERIC type.
 
     .. seealso::
@@ -3255,7 +3229,6 @@ class NUMERIC(Numeric[_N]):
 
 
 class DECIMAL(Numeric[_N]):
-
     """The SQL DECIMAL type.
 
     .. seealso::
@@ -3268,7 +3241,6 @@ class DECIMAL(Numeric[_N]):
 
 
 class INTEGER(Integer):
-
     """The SQL INT or INTEGER type.
 
     .. seealso::
@@ -3284,7 +3256,6 @@ INT = INTEGER
 
 
 class SMALLINT(SmallInteger):
-
     """The SQL SMALLINT type.
 
     .. seealso::
@@ -3297,7 +3268,6 @@ class SMALLINT(SmallInteger):
 
 
 class BIGINT(BigInteger):
-
     """The SQL BIGINT type.
 
     .. seealso::
@@ -3310,7 +3280,6 @@ class BIGINT(BigInteger):
 
 
 class TIMESTAMP(DateTime):
-
     """The SQL TIMESTAMP type.
 
     :class:`_types.TIMESTAMP` datatypes have support for timezone
@@ -3340,35 +3309,30 @@ class TIMESTAMP(DateTime):
 
 
 class DATETIME(DateTime):
-
     """The SQL DATETIME type."""
 
     __visit_name__ = "DATETIME"
 
 
 class DATE(Date):
-
     """The SQL DATE type."""
 
     __visit_name__ = "DATE"
 
 
 class TIME(Time):
-
     """The SQL TIME type."""
 
     __visit_name__ = "TIME"
 
 
 class TEXT(Text):
-
     """The SQL TEXT type."""
 
     __visit_name__ = "TEXT"
 
 
 class CLOB(Text):
-
     """The CLOB type.
 
     This type is found in Oracle and Informix.
@@ -3378,63 +3342,54 @@ class CLOB(Text):
 
 
 class VARCHAR(String):
-
     """The SQL VARCHAR type."""
 
     __visit_name__ = "VARCHAR"
 
 
 class NVARCHAR(Unicode):
-
     """The SQL NVARCHAR type."""
 
     __visit_name__ = "NVARCHAR"
 
 
 class CHAR(String):
-
     """The SQL CHAR type."""
 
     __visit_name__ = "CHAR"
 
 
 class NCHAR(Unicode):
-
     """The SQL NCHAR type."""
 
     __visit_name__ = "NCHAR"
 
 
 class BLOB(LargeBinary):
-
     """The SQL BLOB type."""
 
     __visit_name__ = "BLOB"
 
 
 class BINARY(_Binary):
-
     """The SQL BINARY type."""
 
     __visit_name__ = "BINARY"
 
 
 class VARBINARY(_Binary):
-
     """The SQL VARBINARY type."""
 
     __visit_name__ = "VARBINARY"
 
 
 class BOOLEAN(Boolean):
-
     """The SQL BOOLEAN type."""
 
     __visit_name__ = "BOOLEAN"
 
 
 class NullType(TypeEngine[None]):
-
     """An unknown type.
 
     :class:`.NullType` is used as a default type for those cases where
@@ -3519,7 +3474,6 @@ _UUID_RETURN = TypeVar("_UUID_RETURN", str, _python_UUID)
 
 
 class Uuid(Emulated, TypeEngine[_UUID_RETURN]):
-
     """Represent a database agnostic UUID datatype.
 
     For backends that have no "native" UUID datatype, the value will
@@ -3579,16 +3533,14 @@ class Uuid(Emulated, TypeEngine[_UUID_RETURN]):
         self: Uuid[_python_UUID],
         as_uuid: Literal[True] = ...,
         native_uuid: bool = ...,
-    ):
-        ...
+    ): ...
 
     @overload
     def __init__(
         self: Uuid[str],
         as_uuid: Literal[False] = ...,
         native_uuid: bool = ...,
-    ):
-        ...
+    ): ...
 
     def __init__(self, as_uuid: bool = True, native_uuid: bool = True):
         """Construct a :class:`_sqltypes.Uuid` type.
@@ -3692,34 +3644,25 @@ class Uuid(Emulated, TypeEngine[_UUID_RETURN]):
         if not self.as_uuid:
 
             def process(value):
-                if value is not None:
-                    value = (
-                        f"""'{value.replace("-", "").replace("'", "''")}'"""
-                    )
-                return value
+                return f"""'{value.replace("-", "").replace("'", "''")}'"""
 
             return process
         else:
             if character_based_uuid:
 
                 def process(value):
-                    if value is not None:
-                        value = f"""'{value.hex}'"""
-                    return value
+                    return f"""'{value.hex}'"""
 
                 return process
             else:
 
                 def process(value):
-                    if value is not None:
-                        value = f"""'{str(value).replace("'", "''")}'"""
-                    return value
+                    return f"""'{str(value).replace("'", "''")}'"""
 
                 return process
 
 
 class UUID(Uuid[_UUID_RETURN], type_api.NativeForEmulated):
-
     """Represent the SQL UUID type.
 
     This is the SQL-native form of the :class:`_types.Uuid` database agnostic
@@ -3743,12 +3686,10 @@ class UUID(Uuid[_UUID_RETURN], type_api.NativeForEmulated):
     __visit_name__ = "UUID"
 
     @overload
-    def __init__(self: UUID[_python_UUID], as_uuid: Literal[True] = ...):
-        ...
+    def __init__(self: UUID[_python_UUID], as_uuid: Literal[True] = ...): ...
 
     @overload
-    def __init__(self: UUID[str], as_uuid: Literal[False] = ...):
-        ...
+    def __init__(self: UUID[str], as_uuid: Literal[False] = ...): ...
 
     def __init__(self, as_uuid: bool = True):
         """Construct a :class:`_sqltypes.UUID` type.

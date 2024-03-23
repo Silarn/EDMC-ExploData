@@ -1,5 +1,5 @@
 # orm/attributes.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -120,6 +120,7 @@ if TYPE_CHECKING:
 
 
 _T = TypeVar("_T")
+_T_co = TypeVar("_T_co", bound=Any, covariant=True)
 
 
 _AllPendingType = Sequence[
@@ -132,10 +133,10 @@ _UNKNOWN_ATTR_KEY = object()
 
 @inspection._self_inspects
 class QueryableAttribute(
-    _DeclarativeMapped[_T],
-    SQLORMExpression[_T],
+    _DeclarativeMapped[_T_co],
+    SQLORMExpression[_T_co],
     interfaces.InspectionAttr,
-    interfaces.PropComparator[_T],
+    interfaces.PropComparator[_T_co],
     roles.JoinTargetRole,
     roles.OnClauseRole,
     sql_base.Immutable,
@@ -178,13 +179,13 @@ class QueryableAttribute(
 
     is_attribute = True
 
-    dispatch: dispatcher[QueryableAttribute[_T]]
+    dispatch: dispatcher[QueryableAttribute[_T_co]]
 
     class_: _ExternalEntityType[Any]
     key: str
     parententity: _InternalEntityType[Any]
     impl: AttributeImpl
-    comparator: interfaces.PropComparator[_T]
+    comparator: interfaces.PropComparator[_T_co]
     _of_type: Optional[_InternalEntityType[Any]]
     _extra_criteria: Tuple[ColumnElement[bool], ...]
     _doc: Optional[str]
@@ -198,7 +199,7 @@ class QueryableAttribute(
         class_: _ExternalEntityType[_O],
         key: str,
         parententity: _InternalEntityType[_O],
-        comparator: interfaces.PropComparator[_T],
+        comparator: interfaces.PropComparator[_T_co],
         impl: Optional[AttributeImpl] = None,
         of_type: Optional[_InternalEntityType[Any]] = None,
         extra_criteria: Tuple[ColumnElement[bool], ...] = (),
@@ -314,7 +315,7 @@ class QueryableAttribute(
 
     """
 
-    expression: ColumnElement[_T]
+    expression: ColumnElement[_T_co]
     """The SQL expression object represented by this
     :class:`.QueryableAttribute`.
 
@@ -334,7 +335,7 @@ class QueryableAttribute(
         entity_namespace = self._entity_namespace
         assert isinstance(entity_namespace, HasCacheKey)
 
-        if self.key is _UNKNOWN_ATTR_KEY:  # type: ignore[comparison-overlap]
+        if self.key is _UNKNOWN_ATTR_KEY:
             annotations = {"entity_namespace": entity_namespace}
         else:
             annotations = {
@@ -376,7 +377,7 @@ class QueryableAttribute(
     def _annotations(self) -> _AnnotationDict:
         return self.__clause_element__()._annotations
 
-    def __clause_element__(self) -> ColumnElement[_T]:
+    def __clause_element__(self) -> ColumnElement[_T_co]:
         return self.expression
 
     @property
@@ -443,18 +444,18 @@ class QueryableAttribute(
             extra_criteria=self._extra_criteria,
         )
 
-    def label(self, name: Optional[str]) -> Label[_T]:
+    def label(self, name: Optional[str]) -> Label[_T_co]:
         return self.__clause_element__().label(name)
 
     def operate(
         self, op: OperatorType, *other: Any, **kwargs: Any
     ) -> ColumnElement[Any]:
-        return op(self.comparator, *other, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
+        return op(self.comparator, *other, **kwargs)  # type: ignore[no-any-return]  # noqa: E501
 
     def reverse_operate(
         self, op: OperatorType, other: Any, **kwargs: Any
     ) -> ColumnElement[Any]:
-        return op(other, self.comparator, **kwargs)  # type: ignore[return-value,no-any-return]  # noqa: E501
+        return op(other, self.comparator, **kwargs)  # type: ignore[no-any-return]  # noqa: E501
 
     def hasparent(
         self, state: InstanceState[Any], optimistic: bool = False
@@ -502,7 +503,7 @@ def _queryable_attribute_unreduce(
         return getattr(entity, key)
 
 
-class InstrumentedAttribute(QueryableAttribute[_T]):
+class InstrumentedAttribute(QueryableAttribute[_T_co]):
     """Class bound instrumented attribute which adds basic
     :term:`descriptor` methods.
 
@@ -520,16 +521,16 @@ class InstrumentedAttribute(QueryableAttribute[_T]):
     # InstrumentedAttribute, while still keeping classlevel
     # __doc__ correct
 
-    @util.rw_hybridproperty  # type: ignore
-    def __doc__(self) -> Optional[str]:  # type: ignore
+    @util.rw_hybridproperty
+    def __doc__(self) -> Optional[str]:
         return self._doc
 
     @__doc__.setter  # type: ignore
-    def __doc__(self, value: Optional[str]) -> None:  # type: ignore
+    def __doc__(self, value: Optional[str]) -> None:
         self._doc = value
 
     @__doc__.classlevel  # type: ignore
-    def __doc__(cls) -> Optional[str]:  # type: ignore
+    def __doc__(cls) -> Optional[str]:
         return super().__doc__
 
     def __set__(self, instance: object, value: Any) -> None:
@@ -541,16 +542,16 @@ class InstrumentedAttribute(QueryableAttribute[_T]):
         self.impl.delete(instance_state(instance), instance_dict(instance))
 
     @overload
-    def __get__(self, instance: None, owner: Any) -> InstrumentedAttribute[_T]:
-        ...
+    def __get__(
+        self, instance: None, owner: Any
+    ) -> InstrumentedAttribute[_T_co]: ...
 
     @overload
-    def __get__(self, instance: object, owner: Any) -> _T:
-        ...
+    def __get__(self, instance: object, owner: Any) -> _T_co: ...
 
     def __get__(
         self, instance: Optional[object], owner: Any
-    ) -> Union[InstrumentedAttribute[_T], _T]:
+    ) -> Union[InstrumentedAttribute[_T_co], _T_co]:
         if instance is None:
             return self
 
@@ -790,7 +791,7 @@ class AttributeEventToken:
 
     __slots__ = "impl", "op", "parent_token"
 
-    def __init__(self, attribute_impl, op):
+    def __init__(self, attribute_impl: AttributeImpl, op: util.symbol):
         self.impl = attribute_impl
         self.op = op
         self.parent_token = self.impl.parent_token
@@ -833,7 +834,7 @@ class AttributeImpl:
         self,
         class_: _ExternalEntityType[_O],
         key: str,
-        callable_: _LoaderCallable,
+        callable_: Optional[_LoaderCallable],
         dispatch: _Dispatch[QueryableAttribute[Any]],
         trackparent: bool = False,
         compare_function: Optional[Callable[..., bool]] = None,
@@ -1537,8 +1538,7 @@ class HasCollectionAdapter:
         dict_: _InstanceDict,
         user_data: Literal[None] = ...,
         passive: Literal[PassiveFlag.PASSIVE_OFF] = ...,
-    ) -> CollectionAdapter:
-        ...
+    ) -> CollectionAdapter: ...
 
     @overload
     def get_collection(
@@ -1547,8 +1547,7 @@ class HasCollectionAdapter:
         dict_: _InstanceDict,
         user_data: _AdaptedCollectionProtocol = ...,
         passive: PassiveFlag = ...,
-    ) -> CollectionAdapter:
-        ...
+    ) -> CollectionAdapter: ...
 
     @overload
     def get_collection(
@@ -1559,8 +1558,7 @@ class HasCollectionAdapter:
         passive: PassiveFlag = ...,
     ) -> Union[
         Literal[LoaderCallableStatus.PASSIVE_NO_RESULT], CollectionAdapter
-    ]:
-        ...
+    ]: ...
 
     def get_collection(
         self,
@@ -1591,8 +1589,7 @@ if TYPE_CHECKING:
 
     def _is_collection_attribute_impl(
         impl: AttributeImpl,
-    ) -> TypeGuard[CollectionAttributeImpl]:
-        ...
+    ) -> TypeGuard[CollectionAttributeImpl]: ...
 
 else:
     _is_collection_attribute_impl = operator.attrgetter("collection")
@@ -1940,7 +1937,7 @@ class CollectionAttributeImpl(HasCollectionAdapter, AttributeImpl):
                         and "None"
                         or iterable.__class__.__name__
                     )
-                    wanted = self._duck_typed_as.__name__  # type: ignore
+                    wanted = self._duck_typed_as.__name__
                     raise TypeError(
                         "Incompatible collection type: %s is not %s-like"
                         % (given, wanted)
@@ -2048,8 +2045,7 @@ class CollectionAttributeImpl(HasCollectionAdapter, AttributeImpl):
         dict_: _InstanceDict,
         user_data: Literal[None] = ...,
         passive: Literal[PassiveFlag.PASSIVE_OFF] = ...,
-    ) -> CollectionAdapter:
-        ...
+    ) -> CollectionAdapter: ...
 
     @overload
     def get_collection(
@@ -2058,8 +2054,7 @@ class CollectionAttributeImpl(HasCollectionAdapter, AttributeImpl):
         dict_: _InstanceDict,
         user_data: _AdaptedCollectionProtocol = ...,
         passive: PassiveFlag = ...,
-    ) -> CollectionAdapter:
-        ...
+    ) -> CollectionAdapter: ...
 
     @overload
     def get_collection(
@@ -2070,8 +2065,7 @@ class CollectionAttributeImpl(HasCollectionAdapter, AttributeImpl):
         passive: PassiveFlag = PASSIVE_OFF,
     ) -> Union[
         Literal[LoaderCallableStatus.PASSIVE_NO_RESULT], CollectionAdapter
-    ]:
-        ...
+    ]: ...
 
     def get_collection(
         self,
@@ -2617,7 +2611,7 @@ def register_attribute_impl(
         # TODO: this appears to be the WriteOnlyAttributeImpl /
         # DynamicAttributeImpl constructor which is hardcoded
         impl = cast("Type[WriteOnlyAttributeImpl]", impl_class)(
-            class_, key, typecallable, dispatch, **kw
+            class_, key, dispatch, **kw
         )
     elif uselist:
         impl = CollectionAttributeImpl(

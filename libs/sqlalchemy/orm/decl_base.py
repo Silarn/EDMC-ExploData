@@ -1,5 +1,5 @@
-# ext/declarative/base.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# orm/decl_base.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -98,8 +98,7 @@ class MappedClassProtocol(Protocol[_O]):
     __mapper__: Mapper[_O]
     __table__: FromClause
 
-    def __call__(self, **kw: Any) -> _O:
-        ...
+    def __call__(self, **kw: Any) -> _O: ...
 
 
 class _DeclMappedClassProtocol(MappedClassProtocol[_O], Protocol):
@@ -111,11 +110,9 @@ class _DeclMappedClassProtocol(MappedClassProtocol[_O], Protocol):
 
     _sa_apply_dc_transforms: Optional[_DataclassArguments]
 
-    def __declare_first__(self) -> None:
-        ...
+    def __declare_first__(self) -> None: ...
 
-    def __declare_last__(self) -> None:
-        ...
+    def __declare_last__(self) -> None: ...
 
 
 class _DataclassArguments(TypedDict):
@@ -908,9 +905,9 @@ class _ClassScanMapperConfig(_MapperConfig):
                                     "@declared_attr.cascading; "
                                     "skipping" % (name, cls)
                                 )
-                            collected_attributes[name] = column_copies[
-                                obj
-                            ] = ret = obj.__get__(obj, cls)
+                            collected_attributes[name] = column_copies[obj] = (
+                                ret
+                            ) = obj.__get__(obj, cls)
                             setattr(cls, name, ret)
                         else:
                             if is_dataclass_field:
@@ -947,9 +944,9 @@ class _ClassScanMapperConfig(_MapperConfig):
                             ):
                                 ret = ret.descriptor
 
-                            collected_attributes[name] = column_copies[
-                                obj
-                            ] = ret
+                            collected_attributes[name] = column_copies[obj] = (
+                                ret
+                            )
 
                         if (
                             isinstance(ret, (Column, MapperProperty))
@@ -1130,9 +1127,9 @@ class _ClassScanMapperConfig(_MapperConfig):
         defaults = {}
         for item in field_list:
             if len(item) == 2:
-                name, tp = item  # type: ignore
+                name, tp = item
             elif len(item) == 3:
-                name, tp, spec = item  # type: ignore
+                name, tp, spec = item
                 defaults[name] = spec
             else:
                 assert False
@@ -1434,9 +1431,9 @@ class _ClassScanMapperConfig(_MapperConfig):
             cls, "_sa_decl_prepare_nocascade", strict=True
         )
 
+        allow_unmapped_annotations = self.allow_unmapped_annotations
         expect_annotations_wo_mapped = (
-            self.allow_unmapped_annotations
-            or self.is_dataclass_prior_to_mapping
+            allow_unmapped_annotations or self.is_dataclass_prior_to_mapping
         )
 
         look_for_dataclass_things = bool(self.dataclass_setup_arguments)
@@ -1531,7 +1528,15 @@ class _ClassScanMapperConfig(_MapperConfig):
                     # Mapped[] etc. were not used.  If annotation is None,
                     # do declarative_scan so that the property can raise
                     # for required
-                    if mapped_container is not None or annotation is None:
+                    if (
+                        mapped_container is not None
+                        or annotation is None
+                        # issue #10516: need to do declarative_scan even with
+                        # a non-Mapped annotation if we are doing
+                        # __allow_unmapped__, for things like col.name
+                        # assignment
+                        or allow_unmapped_annotations
+                    ):
                         try:
                             value.declarative_scan(
                                 self,
@@ -1609,7 +1614,7 @@ class _ClassScanMapperConfig(_MapperConfig):
                         setattr(cls, k, value)
                         continue
 
-            our_stuff[k] = value  # type: ignore
+            our_stuff[k] = value
 
     def _extract_declared_columns(self) -> None:
         our_stuff = self.properties
@@ -1979,7 +1984,7 @@ class _DeferredMapperConfig(_ClassScanMapperConfig):
 
     # mypy disallows plain property override of variable
     @property  # type: ignore
-    def cls(self) -> Type[Any]:  # type: ignore
+    def cls(self) -> Type[Any]:
         return self._cls()  # type: ignore
 
     @cls.setter
@@ -1999,7 +2004,7 @@ class _DeferredMapperConfig(_ClassScanMapperConfig):
     @classmethod
     def raise_unmapped_for_cls(cls, class_: Type[Any]) -> NoReturn:
         if hasattr(class_, "_sa_raise_deferred_config"):
-            class_._sa_raise_deferred_config()  # type: ignore
+            class_._sa_raise_deferred_config()
 
         raise orm_exc.UnmappedClassError(
             class_,

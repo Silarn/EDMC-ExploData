@@ -1,5 +1,5 @@
 # orm/_orm_constructors.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -28,8 +28,8 @@ from .properties import MappedColumn
 from .properties import MappedSQLExpression
 from .query import AliasOption
 from .relationships import _RelationshipArgumentType
+from .relationships import _RelationshipDeclared
 from .relationships import _RelationshipSecondaryArgument
-from .relationships import Relationship
 from .relationships import RelationshipProperty
 from .session import Session
 from .util import _ORMJoin
@@ -114,7 +114,7 @@ def mapped_column(
     primary_key: Optional[bool] = False,
     deferred: Union[_NoArg, bool] = _NoArg.NO_ARG,
     deferred_group: Optional[str] = None,
-    deferred_raiseload: bool = False,
+    deferred_raiseload: Optional[bool] = None,
     use_existing_column: bool = False,
     name: Optional[str] = None,
     type_: Optional[_TypeEngineArgument[Any]] = None,
@@ -132,7 +132,7 @@ def mapped_column(
     quote: Optional[bool] = None,
     system: bool = False,
     comment: Optional[str] = None,
-    sort_order: int = 0,
+    sort_order: Union[_NoArg, int] = _NoArg.NO_ARG,
     **kw: Any,
 ) -> MappedColumn[Any]:
     r"""declare a new ORM-mapped :class:`_schema.Column` construct
@@ -385,9 +385,9 @@ def orm_insert_sentinel(
 
     return mapped_column(
         name=name,
-        default=default
-        if default is not None
-        else _InsertSentinelColumnDefault(),
+        default=(
+            default if default is not None else _InsertSentinelColumnDefault()
+        ),
         _omit_from_statements=omit_from_statements,
         insert_sentinel=True,
         use_existing_column=True,
@@ -559,8 +559,7 @@ def composite(
     info: Optional[_InfoType] = None,
     doc: Optional[str] = None,
     **__kw: Any,
-) -> Composite[Any]:
-    ...
+) -> Composite[Any]: ...
 
 
 @overload
@@ -581,8 +580,7 @@ def composite(
     info: Optional[_InfoType] = None,
     doc: Optional[str] = None,
     **__kw: Any,
-) -> Composite[_CC]:
-    ...
+) -> Composite[_CC]: ...
 
 
 @overload
@@ -603,8 +601,7 @@ def composite(
     info: Optional[_InfoType] = None,
     doc: Optional[str] = None,
     **__kw: Any,
-) -> Composite[_CC]:
-    ...
+) -> Composite[_CC]: ...
 
 
 def composite(
@@ -719,7 +716,10 @@ def composite(
 
 def with_loader_criteria(
     entity_or_base: _EntityType[Any],
-    where_criteria: _ColumnExpressionArgument[bool],
+    where_criteria: Union[
+        _ColumnExpressionArgument[bool],
+        Callable[[Any], _ColumnExpressionArgument[bool]],
+    ],
     loader_only: bool = False,
     include_aliases: bool = False,
     propagate_to_loaders: bool = True,
@@ -950,7 +950,7 @@ def relationship(
     omit_join: Literal[None, False] = None,
     sync_backref: Optional[bool] = None,
     **kw: Any,
-) -> Relationship[Any]:
+) -> _RelationshipDeclared[Any]:
     """Provide a relationship between two mapped classes.
 
     This corresponds to a parent-child or associative table relationship.
@@ -1688,19 +1688,10 @@ def relationship(
       the full set of related objects, to prevent modifications of the
       collection from resulting in persistence operations.
 
-      When using the :paramref:`_orm.relationship.viewonly` flag in
-      conjunction with backrefs, the originating relationship for a
-      particular state change will not produce state changes within the
-      viewonly relationship.   This is the behavior implied by
-      :paramref:`_orm.relationship.sync_backref` being set to False.
-
-      .. versionchanged:: 1.3.17 - the
-         :paramref:`_orm.relationship.sync_backref` flag is set to False
-             when using viewonly in conjunction with backrefs.
-
       .. seealso::
 
-        :paramref:`_orm.relationship.sync_backref`
+        :ref:`relationship_viewonly_notes` - more details on best practices
+        when using :paramref:`_orm.relationship.viewonly`.
 
     :param sync_backref:
       A boolean that enables the events used to synchronize the in-Python
@@ -1765,7 +1756,7 @@ def relationship(
 
     """
 
-    return Relationship(
+    return _RelationshipDeclared(
         argument,
         secondary=secondary,
         uselist=uselist,
@@ -2186,8 +2177,7 @@ def aliased(
     name: Optional[str] = None,
     flat: bool = False,
     adapt_on_names: bool = False,
-) -> AliasedType[_O]:
-    ...
+) -> AliasedType[_O]: ...
 
 
 @overload
@@ -2197,8 +2187,7 @@ def aliased(
     name: Optional[str] = None,
     flat: bool = False,
     adapt_on_names: bool = False,
-) -> AliasedClass[_O]:
-    ...
+) -> AliasedClass[_O]: ...
 
 
 @overload
@@ -2208,8 +2197,7 @@ def aliased(
     name: Optional[str] = None,
     flat: bool = False,
     adapt_on_names: bool = False,
-) -> FromClause:
-    ...
+) -> FromClause: ...
 
 
 def aliased(

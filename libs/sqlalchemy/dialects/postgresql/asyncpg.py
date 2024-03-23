@@ -1,5 +1,5 @@
-# postgresql/asyncpg.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors <see AUTHORS
+# dialects/postgresql/asyncpg.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors <see AUTHORS
 # file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -24,17 +24,6 @@ This dialect should normally be used only with the
 
     from sqlalchemy.ext.asyncio import create_async_engine
     engine = create_async_engine("postgresql+asyncpg://user:pass@hostname/dbname")
-
-The dialect can also be run as a "synchronous" dialect within the
-:func:`_sa.create_engine` function, which will pass "await" calls into
-an ad-hoc event loop.  This mode of operation is of **limited use**
-and is for special testing scenarios only.  The mode can be enabled by
-adding the SQLAlchemy-specific flag ``async_fallback`` to the URL
-in conjunction with :func:`_sa.create_engine`::
-
-    # for testing purposes only; do not use in production!
-    engine = create_engine("postgresql+asyncpg://user:pass@hostname/dbname?async_fallback=true")
-
 
 .. versionadded:: 1.4
 
@@ -123,8 +112,8 @@ To disable the prepared statement cache, use a value of zero::
 
 .. _asyncpg_prepared_statement_name:
 
-Prepared Statement Name
------------------------
+Prepared Statement Name with PGBouncer
+--------------------------------------
 
 By default, asyncpg enumerates prepared statements in numeric order, which
 can lead to errors if a name has already been taken for another prepared
@@ -139,7 +128,7 @@ a prepared statement is prepared::
     from uuid import uuid4
 
     engine = create_async_engine(
-        "postgresql+asyncpg://user:pass@hostname/dbname",
+        "postgresql+asyncpg://user:pass@somepgbouncer/dbname",
         poolclass=NullPool,
         connect_args={
             'prepared_statement_name_func': lambda:  f'__asyncpg_{uuid4()}__',
@@ -152,7 +141,7 @@ a prepared statement is prepared::
 
    https://github.com/sqlalchemy/sqlalchemy/issues/6467
 
-.. warning:: To prevent a buildup of useless prepared statements in
+.. warning:: When using PGBouncer, to prevent a buildup of useless prepared statements in
    your application, it's important to use the :class:`.NullPool` pool
    class, and to configure PgBouncer to use `DISCARD <https://www.postgresql.org/docs/current/sql-discard.html>`_
    when returning connections.  The DISCARD command is used to release resources held by the db connection,
@@ -187,8 +176,6 @@ import decimal
 import json as _py_json
 import re
 import time
-from typing import cast
-from typing import TYPE_CHECKING
 
 from . import json
 from . import ranges
@@ -205,6 +192,7 @@ from .base import PGExecutionContext
 from .base import PGIdentifierPreparer
 from .base import REGCLASS
 from .base import REGCONFIG
+from .types import BIT
 from .types import BYTEA
 from .types import CITEXT
 from ... import exc
@@ -216,9 +204,6 @@ from ...sql import sqltypes
 from ...util.concurrency import asyncio
 from ...util.concurrency import await_fallback
 from ...util.concurrency import await_only
-
-if TYPE_CHECKING:
-    from typing import Iterable
 
 
 class AsyncpgARRAY(PGARRAY):
@@ -234,6 +219,10 @@ class AsyncpgREGCONFIG(REGCONFIG):
 
 
 class AsyncpgTime(sqltypes.Time):
+    render_bind_cast = True
+
+
+class AsyncpgBit(BIT):
     render_bind_cast = True
 
 
@@ -367,7 +356,7 @@ class AsyncpgCHAR(sqltypes.CHAR):
     render_bind_cast = True
 
 
-class _AsyncpgRange(ranges.AbstractRangeImpl):
+class _AsyncpgRange(ranges.AbstractSingleRangeImpl):
     def bind_processor(self, dialect):
         asyncpg_Range = dialect.dbapi.asyncpg.Range
 
@@ -421,10 +410,7 @@ class _AsyncpgMultiRange(ranges.AbstractMultiRangeImpl):
                     )
                 return value
 
-            return [
-                to_range(element)
-                for element in cast("Iterable[ranges.Range]", value)
-            ]
+            return [to_range(element) for element in value]
 
         return to_range
 
@@ -443,7 +429,7 @@ class _AsyncpgMultiRange(ranges.AbstractMultiRangeImpl):
                 return rvalue
 
             if value is not None:
-                value = [to_range(elem) for elem in value]
+                value = ranges.MultiRange(to_range(elem) for elem in value)
 
             return value
 
@@ -566,6 +552,7 @@ class AsyncAdapt_asyncpg_cursor:
     async def _executemany(self, operation, seq_of_parameters):
         adapt_connection = self._adapt_connection
 
+        self.description = None
         async with adapt_connection._execute_mutex:
             await adapt_connection._check_type_cache_invalidation(
                 self._invalidate_schema_cache_asof
@@ -796,9 +783,9 @@ class AsyncAdapt_asyncpg_connection(AdaptedConnection):
                     translated_error = exception_mapping[super_](
                         "%s: %s" % (type(error), error)
                     )
-                    translated_error.pgcode = (
-                        translated_error.sqlstate
-                    ) = getattr(error, "sqlstate", None)
+                    translated_error.pgcode = translated_error.sqlstate = (
+                        getattr(error, "sqlstate", None)
+                    )
                     raise translated_error from error
             else:
                 raise error
@@ -818,9 +805,22 @@ class AsyncAdapt_asyncpg_connection(AdaptedConnection):
 
     def ping(self):
         try:
-            _ = self.await_(self._connection.fetchrow(";"))
+            _ = self.await_(self._async_ping())
         except Exception as error:
             self._handle_exception(error)
+
+    async def _async_ping(self):
+        if self._transaction is None and self.isolation_level != "autocommit":
+            # create a tranasction explicitly to support pgbouncer
+            # transaction mode.   See #10226
+            tr = self._connection.transaction()
+            await tr.start()
+            try:
+                await self._connection.fetchrow(";")
+            finally:
+                await tr.rollback()
+        else:
+            await self._connection.fetchrow(";")
 
     def set_isolation_level(self, level):
         if self._started:
@@ -875,7 +875,27 @@ class AsyncAdapt_asyncpg_connection(AdaptedConnection):
         self.await_(self._connection.close())
 
     def terminate(self):
-        self._connection.terminate()
+        if util.concurrency.in_greenlet():
+            # in a greenlet; this is the connection was invalidated
+            # case.
+            try:
+                # try to gracefully close; see #10717
+                # timeout added in asyncpg 0.14.0 December 2017
+                self.await_(self._connection.close(timeout=2))
+            except (
+                asyncio.TimeoutError,
+                OSError,
+                self.dbapi.asyncpg.PostgresError,
+            ):
+                # in the case where we are recycling an old connection
+                # that may have already been disconnected, close() will
+                # fail with the above timeout.  in this case, terminate
+                # the connection without any further waiting.
+                # see issue #8419
+                self._connection.terminate()
+        else:
+            # not in a greenlet; this is the gc cleanup case
+            self._connection.terminate()
         self._started = False
 
     @staticmethod
@@ -1002,6 +1022,7 @@ class PGDialect_asyncpg(PGDialect):
         {
             sqltypes.String: AsyncpgString,
             sqltypes.ARRAY: AsyncpgARRAY,
+            BIT: AsyncpgBit,
             CITEXT: CITEXT,
             REGCONFIG: AsyncpgREGCONFIG,
             sqltypes.Time: AsyncpgTime,
@@ -1025,7 +1046,7 @@ class PGDialect_asyncpg(PGDialect):
             OID: AsyncpgOID,
             REGCLASS: AsyncpgREGCLASS,
             sqltypes.CHAR: AsyncpgCHAR,
-            ranges.AbstractRange: _AsyncpgRange,
+            ranges.AbstractSingleRange: _AsyncpgRange,
             ranges.AbstractMultiRange: _AsyncpgMultiRange,
         },
     )

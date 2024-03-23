@@ -1,5 +1,5 @@
-# postgresql/pg8000.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors <see AUTHORS
+# dialects/postgresql/pg8000.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors <see AUTHORS
 # file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -253,7 +253,7 @@ class _PGOIDVECTOR(_SpaceVector, OIDVECTOR):
     pass
 
 
-class _Pg8000Range(ranges.AbstractRangeImpl):
+class _Pg8000Range(ranges.AbstractSingleRangeImpl):
     def bind_processor(self, dialect):
         pg8000_Range = dialect.dbapi.Range
 
@@ -304,15 +304,13 @@ class _Pg8000MultiRange(ranges.AbstractMultiRangeImpl):
         def to_multirange(value):
             if value is None:
                 return None
-
-            mr = []
-            for v in value:
-                mr.append(
+            else:
+                return ranges.MultiRange(
                     ranges.Range(
                         v.lower, v.upper, bounds=v.bounds, empty=v.is_empty
                     )
+                    for v in value
                 )
-            return mr
 
         return to_multirange
 
@@ -584,8 +582,8 @@ class PGDialect_pg8000(PGDialect):
         cursor = dbapi_connection.cursor()
         cursor.execute(
             f"""SET CLIENT_ENCODING TO '{
-            client_encoding.replace("'", "''")
-        }'"""
+                client_encoding.replace("'", "''")
+            }'"""
         )
         cursor.execute("COMMIT")
         cursor.close()

@@ -1,5 +1,5 @@
 # testing/requirements.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -22,9 +22,8 @@ from __future__ import annotations
 import platform
 
 from . import asyncio as _test_asyncio
-from . import config
 from . import exclusions
-from . import only_on
+from .exclusions import only_on
 from .. import create_engine
 from .. import util
 from ..pool import QueuePool
@@ -56,6 +55,12 @@ class SuiteRequirements(Requirements):
     @property
     def index_ddl_if_exists(self):
         """target platform supports IF NOT EXISTS / IF EXISTS for indexes."""
+
+        return exclusions.closed()
+
+    @property
+    def uuid_data_type(self):
+        """Return databases that support the UUID datatype."""
 
         return exclusions.closed()
 
@@ -841,6 +846,14 @@ class SuiteRequirements(Requirements):
         return exclusions.open()
 
     @property
+    def datetime_interval(self):
+        """target dialect supports rendering of a datetime.timedelta as a
+        literal string, e.g. via the TypeEngine.literal_processor() method.
+
+        """
+        return exclusions.closed()
+
+    @property
     def datetime_literals(self):
         """target dialect supports rendering of a date, time, or datetime as a
         literal string, e.g. via the TypeEngine.literal_processor() method.
@@ -1448,10 +1461,14 @@ class SuiteRequirements(Requirements):
 
     @property
     def timing_intensive(self):
+        from . import config
+
         return config.add_to_marker.timing_intensive
 
     @property
     def memory_intensive(self):
+        from . import config
+
         return config.add_to_marker.memory_intensive
 
     @property
@@ -1511,6 +1528,12 @@ class SuiteRequirements(Requirements):
     def python311(self):
         return exclusions.only_if(
             lambda: util.py311, "Python 3.11 or above required"
+        )
+
+    @property
+    def python312(self):
+        return exclusions.only_if(
+            lambda: util.py312, "Python 3.12 or above required"
         )
 
     @property
@@ -1591,6 +1614,18 @@ class SuiteRequirements(Requirements):
     @property
     def asyncio(self):
         return self.greenlet
+
+    @property
+    def no_greenlet(self):
+        def go(config):
+            try:
+                import greenlet  # noqa: F401
+            except ImportError:
+                return True
+            else:
+                return False
+
+        return exclusions.only_if(go)
 
     @property
     def greenlet(self):

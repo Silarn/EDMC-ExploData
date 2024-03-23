@@ -1,5 +1,5 @@
 # util/__init__.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -49,7 +49,6 @@ from ._collections import WeakPopulateDict as WeakPopulateDict
 from ._collections import WeakSequence as WeakSequence
 from .compat import anext_ as anext_
 from .compat import arm as arm
-from .compat import athrow as athrow
 from .compat import b as b
 from .compat import b64decode as b64decode
 from .compat import b64encode as b64encode
@@ -157,3 +156,4 @@ from .langhelpers import warn_exception as warn_exception
 from .langhelpers import warn_limited as warn_limited
 from .langhelpers import wrap_callable as wrap_callable
 from .preloaded import preload_module as preload_module
+from .typing import is_non_string_iterable as is_non_string_iterable

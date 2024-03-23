@@ -1,5 +1,5 @@
-# postgresql/array.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/postgresql/array.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -46,7 +46,6 @@ def All(other, arrexpr, operator=operators.eq):
 
 
 class array(expression.ExpressionClauseList[_T]):
-
     """A PostgreSQL ARRAY literal.
 
     This is used to produce ARRAY literals in SQL expressions, e.g.::
@@ -110,17 +109,17 @@ class array(expression.ExpressionClauseList[_T]):
         main_type = (
             type_arg
             if type_arg is not None
-            else self._type_tuple[0]
-            if self._type_tuple
-            else sqltypes.NULLTYPE
+            else self._type_tuple[0] if self._type_tuple else sqltypes.NULLTYPE
         )
 
         if isinstance(main_type, ARRAY):
             self.type = ARRAY(
                 main_type.item_type,
-                dimensions=main_type.dimensions + 1
-                if main_type.dimensions is not None
-                else 2,
+                dimensions=(
+                    main_type.dimensions + 1
+                    if main_type.dimensions is not None
+                    else 2
+                ),
             )
         else:
             self.type = ARRAY(main_type)
@@ -184,8 +183,9 @@ class ARRAY(sqltypes.ARRAY):
 
         mytable.c.data.contains([1, 2])
 
-    The :class:`_postgresql.ARRAY` type may not be supported on all
-    PostgreSQL DBAPIs; it is currently known to work on psycopg2 only.
+    Indexed access is one-based by default, to match that of PostgreSQL;
+    for zero-based indexed access, set
+    :paramref:`_postgresql.ARRAY.zero_indexes`.
 
     Additionally, the :class:`_postgresql.ARRAY`
     type does not work directly in
@@ -224,42 +224,6 @@ class ARRAY(sqltypes.ARRAY):
         :class:`_postgresql.array` - produces a literal array value.
 
     """
-
-    class Comparator(sqltypes.ARRAY.Comparator):
-
-        """Define comparison operations for :class:`_types.ARRAY`.
-
-        Note that these operations are in addition to those provided
-        by the base :class:`.types.ARRAY.Comparator` class, including
-        :meth:`.types.ARRAY.Comparator.any` and
-        :meth:`.types.ARRAY.Comparator.all`.
-
-        """
-
-        def contains(self, other, **kwargs):
-            """Boolean expression.  Test if elements are a superset of the
-            elements of the argument array expression.
-
-            kwargs may be ignored by this operator but are required for API
-            conformance.
-            """
-            return self.operate(CONTAINS, other, result_type=sqltypes.Boolean)
-
-        def contained_by(self, other):
-            """Boolean expression.  Test if elements are a proper subset of the
-            elements of the argument array expression.
-            """
-            return self.operate(
-                CONTAINED_BY, other, result_type=sqltypes.Boolean
-            )
-
-        def overlap(self, other):
-            """Boolean expression.  Test if array has elements in common with
-            an argument array expression.
-            """
-            return self.operate(OVERLAP, other, result_type=sqltypes.Boolean)
-
-    comparator_factory = Comparator
 
     def __init__(
         self,
@@ -311,6 +275,41 @@ class ARRAY(sqltypes.ARRAY):
         self.as_tuple = as_tuple
         self.dimensions = dimensions
         self.zero_indexes = zero_indexes
+
+    class Comparator(sqltypes.ARRAY.Comparator):
+        """Define comparison operations for :class:`_types.ARRAY`.
+
+        Note that these operations are in addition to those provided
+        by the base :class:`.types.ARRAY.Comparator` class, including
+        :meth:`.types.ARRAY.Comparator.any` and
+        :meth:`.types.ARRAY.Comparator.all`.
+
+        """
+
+        def contains(self, other, **kwargs):
+            """Boolean expression.  Test if elements are a superset of the
+            elements of the argument array expression.
+
+            kwargs may be ignored by this operator but are required for API
+            conformance.
+            """
+            return self.operate(CONTAINS, other, result_type=sqltypes.Boolean)
+
+        def contained_by(self, other):
+            """Boolean expression.  Test if elements are a proper subset of the
+            elements of the argument array expression.
+            """
+            return self.operate(
+                CONTAINED_BY, other, result_type=sqltypes.Boolean
+            )
+
+        def overlap(self, other):
+            """Boolean expression.  Test if array has elements in common with
+            an argument array expression.
+            """
+            return self.operate(OVERLAP, other, result_type=sqltypes.Boolean)
+
+    comparator_factory = Comparator
 
     @property
     def hashable(self):

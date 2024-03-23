@@ -1,5 +1,5 @@
-# mysql/aiomysql.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors <see AUTHORS
+# dialects/mysql/aiomysql.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors <see AUTHORS
 # file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -37,6 +37,8 @@ from ...util.concurrency import await_only
 
 
 class AsyncAdapt_aiomysql_cursor:
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     server_side = False
     __slots__ = (
         "_adapt_connection",
@@ -139,6 +141,8 @@ class AsyncAdapt_aiomysql_cursor:
 
 
 class AsyncAdapt_aiomysql_ss_cursor(AsyncAdapt_aiomysql_cursor):
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     __slots__ = ()
     server_side = True
 
@@ -167,6 +171,8 @@ class AsyncAdapt_aiomysql_ss_cursor(AsyncAdapt_aiomysql_cursor):
 
 
 class AsyncAdapt_aiomysql_connection(AdaptedConnection):
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     await_ = staticmethod(await_only)
     __slots__ = ("dbapi", "_execute_mutex")
 
@@ -196,12 +202,17 @@ class AsyncAdapt_aiomysql_connection(AdaptedConnection):
     def commit(self):
         self.await_(self._connection.commit())
 
-    def close(self):
+    def terminate(self):
         # it's not awaitable.
         self._connection.close()
 
+    def close(self) -> None:
+        self.await_(self._connection.ensure_closed())
+
 
 class AsyncAdaptFallback_aiomysql_connection(AsyncAdapt_aiomysql_connection):
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     __slots__ = ()
 
     await_ = staticmethod(await_fallback)
@@ -277,6 +288,7 @@ class MySQLDialect_aiomysql(MySQLDialect_pymysql):
     _sscursor = AsyncAdapt_aiomysql_ss_cursor
 
     is_async = True
+    has_terminate = True
 
     @classmethod
     def import_dbapi(cls):
@@ -292,6 +304,9 @@ class MySQLDialect_aiomysql(MySQLDialect_pymysql):
             return pool.FallbackAsyncAdaptedQueuePool
         else:
             return pool.AsyncAdaptedQueuePool
+
+    def do_terminate(self, dbapi_connection) -> None:
+        dbapi_connection.terminate()
 
     def create_connect_args(self, url):
         return super().create_connect_args(

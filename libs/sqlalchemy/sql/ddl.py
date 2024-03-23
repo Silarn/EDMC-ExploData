@@ -1,5 +1,5 @@
 # sql/ddl.py
-# Copyright (C) 2009-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2009-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -95,8 +95,7 @@ class DDLIfCallable(Protocol):
         dialect: Dialect,
         compiler: Optional[DDLCompiler] = ...,
         checkfirst: bool,
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
 
 class DDLIf(typing.NamedTuple):
@@ -403,17 +402,14 @@ class DDL(ExecutableDDLElement):
         self.context = context or {}
 
     def __repr__(self):
+        parts = [repr(self.statement)]
+        if self.context:
+            parts.append(f"context={self.context}")
+
         return "<%s@%s; %s>" % (
             type(self).__name__,
             id(self),
-            ", ".join(
-                [repr(self.statement)]
-                + [
-                    "%s=%r" % (key, getattr(self, key))
-                    for key in ("on", "context")
-                    if getattr(self, key)
-                ]
-            ),
+            ", ".join(parts),
         )
 
 
@@ -470,7 +466,7 @@ class CreateSchema(_CreateBase):
 
     __visit_name__ = "create_schema"
 
-    stringify_dialect = "default"  # type: ignore
+    stringify_dialect = "default"
 
     def __init__(
         self,
@@ -491,7 +487,7 @@ class DropSchema(_DropBase):
 
     __visit_name__ = "drop_schema"
 
-    stringify_dialect = "default"  # type: ignore
+    stringify_dialect = "default"
 
     def __init__(
         self,
@@ -1024,10 +1020,12 @@ class SchemaDropper(InvokeDropDDLBase):
                 reversed(
                     sort_tables_and_constraints(
                         unsorted_tables,
-                        filter_fn=lambda constraint: False
-                        if not self.dialect.supports_alter
-                        or constraint.name is None
-                        else None,
+                        filter_fn=lambda constraint: (
+                            False
+                            if not self.dialect.supports_alter
+                            or constraint.name is None
+                            else None
+                        ),
                     )
                 )
             )

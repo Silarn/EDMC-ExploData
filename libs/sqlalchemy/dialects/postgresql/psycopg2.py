@@ -1,5 +1,5 @@
-# postgresql/psycopg2.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/postgresql/psycopg2.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -254,7 +254,7 @@ equivalent to psycopg2's ``execute_values()`` handler; an overview of this
 feature and its configuration are at :ref:`engine_insertmanyvalues`.
 
 .. versionadded:: 2.0 Replaced psycopg2's ``execute_values()`` fast execution
-   helper with a native SQLAlchemy mechanism referred towards as
+   helper with a native SQLAlchemy mechanism known as
    :ref:`insertmanyvalues <engine_insertmanyvalues>`.
 
 The psycopg2 dialect retains the ability to use the psycopg2-specific
@@ -513,7 +513,7 @@ class _PGJSONB(JSONB):
         return None
 
 
-class _Psycopg2Range(ranges.AbstractRangeImpl):
+class _Psycopg2Range(ranges.AbstractSingleRangeImpl):
     _psycopg2_range_cls = "none"
 
     def bind_processor(self, dialect):

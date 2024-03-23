@@ -1,5 +1,5 @@
 # engine/interfaces.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -118,17 +118,13 @@ class DBAPIConnection(Protocol):
 
     """  # noqa: E501
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
-    def commit(self) -> None:
-        ...
+    def commit(self) -> None: ...
 
-    def cursor(self) -> DBAPICursor:
-        ...
+    def cursor(self) -> DBAPICursor: ...
 
-    def rollback(self) -> None:
-        ...
+    def rollback(self) -> None: ...
 
     autocommit: bool
 
@@ -174,53 +170,43 @@ class DBAPICursor(Protocol):
         ...
 
     @property
-    def rowcount(self) -> int:
-        ...
+    def rowcount(self) -> int: ...
 
     arraysize: int
 
     lastrowid: int
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
     def execute(
         self,
         operation: Any,
         parameters: Optional[_DBAPISingleExecuteParams] = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     def executemany(
         self,
         operation: Any,
-        parameters: Sequence[_DBAPIMultiExecuteParams],
-    ) -> Any:
-        ...
+        parameters: _DBAPIMultiExecuteParams,
+    ) -> Any: ...
 
-    def fetchone(self) -> Optional[Any]:
-        ...
+    def fetchone(self) -> Optional[Any]: ...
 
-    def fetchmany(self, size: int = ...) -> Sequence[Any]:
-        ...
+    def fetchmany(self, size: int = ...) -> Sequence[Any]: ...
 
-    def fetchall(self) -> Sequence[Any]:
-        ...
+    def fetchall(self) -> Sequence[Any]: ...
 
-    def setinputsizes(self, sizes: Sequence[Any]) -> None:
-        ...
+    def setinputsizes(self, sizes: Sequence[Any]) -> None: ...
 
-    def setoutputsize(self, size: Any, column: Any) -> None:
-        ...
+    def setoutputsize(self, size: Any, column: Any) -> None: ...
 
-    def callproc(self, procname: str, parameters: Sequence[Any] = ...) -> Any:
-        ...
+    def callproc(
+        self, procname: str, parameters: Sequence[Any] = ...
+    ) -> Any: ...
 
-    def nextset(self) -> Optional[bool]:
-        ...
+    def nextset(self) -> Optional[bool]: ...
 
-    def __getattr__(self, key: str) -> Any:
-        ...
+    def __getattr__(self, key: str) -> Any: ...
 
 
 _CoreSingleExecuteParams = Mapping[str, Any]
@@ -284,6 +270,7 @@ class _CoreKnownExecutionOptions(TypedDict, total=False):
     yield_per: int
     insertmanyvalues_page_size: int
     schema_translate_map: Optional[SchemaTranslateMapType]
+    preserve_rowcount: bool
 
 
 _ExecuteOptions = immutabledict[str, Any]
@@ -521,7 +508,7 @@ class ReflectedIndex(TypedDict):
     """index name"""
 
     column_names: List[Optional[str]]
-    """column names which the index refers towards.
+    """column names which the index references.
     An element of this list is ``None`` if it's an expression and is
     returned in the ``expressions`` list.
     """
@@ -1303,8 +1290,7 @@ class Dialect(EventTarget):
 
     if TYPE_CHECKING:
 
-        def _overrides_default(self, method_name: str) -> bool:
-            ...
+        def _overrides_default(self, method_name: str) -> bool: ...
 
     def get_columns(
         self,
@@ -2991,6 +2977,9 @@ class ExecutionContext:
     """a list of Column objects for which a server-side default or
       inline SQL expression value was fired off.  Applies to inserts
       and updates."""
+
+    execution_options: _ExecuteOptions
+    """Execution options associated with the current statement execution"""
 
     @classmethod
     def _init_ddl(

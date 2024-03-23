@@ -1,5 +1,5 @@
 # orm/persistence.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -140,11 +140,13 @@ def post_update(base_mapper, states, uowtransaction, post_update_cols):
                 state_dict,
                 sub_mapper,
                 connection,
-                mapper._get_committed_state_attr_by_column(
-                    state, state_dict, mapper.version_id_col
-                )
-                if mapper.version_id_col is not None
-                else None,
+                (
+                    mapper._get_committed_state_attr_by_column(
+                        state, state_dict, mapper.version_id_col
+                    )
+                    if mapper.version_id_col is not None
+                    else None
+                ),
             )
             for state, state_dict, sub_mapper, connection in states_to_update
             if table in sub_mapper._pks_by_table
@@ -559,7 +561,8 @@ def _collect_update_commands(
                     f"No primary key value supplied for column(s) "
                     f"""{
                         ', '.join(
-                        str(c) for c in pks if pk_params[c._label] is None)
+                            str(c) for c in pks if pk_params[c._label] is None
+                        )
                     }; """
                     "per-row ORM Bulk UPDATE by Primary Key requires that "
                     "records contain primary key values",
@@ -702,10 +705,10 @@ def _collect_delete_commands(
 
         params = {}
         for col in mapper._pks_by_table[table]:
-            params[
-                col.key
-            ] = value = mapper._get_committed_state_attr_by_column(
-                state, state_dict, col
+            params[col.key] = value = (
+                mapper._get_committed_state_attr_by_column(
+                    state, state_dict, col
+                )
             )
             if value is None:
                 raise orm_exc.FlushError(
@@ -933,9 +936,11 @@ def _emit_update_statements(
                             c.context.compiled_parameters[0],
                             value_params,
                             True,
-                            c.returned_defaults
-                            if not c.context.executemany
-                            else None,
+                            (
+                                c.returned_defaults
+                                if not c.context.executemany
+                                else None
+                            ),
                         )
 
         if check_rowcount:
@@ -1068,9 +1073,11 @@ def _emit_insert_statements(
                             last_inserted_params,
                             value_params,
                             False,
-                            result.returned_defaults
-                            if not result.context.executemany
-                            else None,
+                            (
+                                result.returned_defaults
+                                if not result.context.executemany
+                                else None
+                            ),
                         )
                     else:
                         _postfetch_bulk_save(mapper_rec, state_dict, table)
@@ -1082,7 +1089,7 @@ def _emit_insert_statements(
             records = list(records)
 
             if returning_is_required_anyway or (
-                not hasvalue and len(records) > 1
+                table.implicit_returning and not hasvalue and len(records) > 1
             ):
                 if (
                     deterministic_results_reqd
@@ -1260,9 +1267,11 @@ def _emit_insert_statements(
                                 result.context.compiled_parameters[0],
                                 value_params,
                                 False,
-                                result.returned_defaults
-                                if not result.context.executemany
-                                else None,
+                                (
+                                    result.returned_defaults
+                                    if not result.context.executemany
+                                    else None
+                                ),
                             )
                         else:
                             _postfetch_bulk_save(mapper_rec, state_dict, table)
@@ -1569,16 +1578,25 @@ def _finalize_insert_update_commands(base_mapper, uowtransaction, states):
 def _postfetch_post_update(
     mapper, uowtransaction, table, state, dict_, result, params
 ):
-    if uowtransaction.is_deleted(state):
-        return
-
-    prefetch_cols = result.context.compiled.prefetch
-    postfetch_cols = result.context.compiled.postfetch
-
-    if (
+    needs_version_id = (
         mapper.version_id_col is not None
         and mapper.version_id_col in mapper._cols_by_table[table]
-    ):
+    )
+
+    if not uowtransaction.is_deleted(state):
+        # post updating after a regular INSERT or UPDATE, do a full postfetch
+        prefetch_cols = result.context.compiled.prefetch
+        postfetch_cols = result.context.compiled.postfetch
+    elif needs_version_id:
+        # post updating before a DELETE with a version_id_col, need to
+        # postfetch just version_id_col
+        prefetch_cols = postfetch_cols = ()
+    else:
+        # post updating before a DELETE without a version_id_col,
+        # don't need to postfetch
+        return
+
+    if needs_version_id:
         prefetch_cols = list(prefetch_cols) + [mapper.version_id_col]
 
     refresh_flush = bool(mapper.class_manager.dispatch.refresh_flush)
@@ -1658,9 +1676,18 @@ def _postfetch(
 
     for c in prefetch_cols:
         if c.key in params and c in mapper._columntoproperty:
-            dict_[mapper._columntoproperty[c].key] = params[c.key]
+            pkey = mapper._columntoproperty[c].key
+
+            # set prefetched value in dict and also pop from committed_state,
+            # since this is new database state that replaces whatever might
+            # have previously been fetched (see #10800).  this is essentially a
+            # shorthand version of set_committed_value(), which could also be
+            # used here directly (with more overhead)
+            dict_[pkey] = params[c.key]
+            state.committed_state.pop(pkey, None)
+
             if refresh_flush:
-                load_evt_attrs.append(mapper._columntoproperty[c].key)
+                load_evt_attrs.append(pkey)
 
     if refresh_flush and load_evt_attrs:
         mapper.class_manager.dispatch.refresh_flush(

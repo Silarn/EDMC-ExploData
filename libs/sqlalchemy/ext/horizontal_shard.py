@@ -1,5 +1,5 @@
 # ext/horizontal_shard.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -83,8 +83,7 @@ class ShardChooser(Protocol):
         mapper: Optional[Mapper[_T]],
         instance: Any,
         clause: Optional[ClauseElement],
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 class IdentityChooser(Protocol):
@@ -97,8 +96,7 @@ class IdentityChooser(Protocol):
         execution_options: OrmExecuteOptionsParameter,
         bind_arguments: _BindArguments,
         **kw: Any,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 class ShardedQuery(Query[_T]):

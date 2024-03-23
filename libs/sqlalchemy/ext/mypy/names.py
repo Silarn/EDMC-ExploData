@@ -1,5 +1,5 @@
 # ext/mypy/names.py
-# Copyright (C) 2021 the SQLAlchemy authors and contributors
+# Copyright (C) 2021-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -34,30 +34,37 @@ from mypy.types import UnboundType
 
 from ... import util
 
-COLUMN: int = util.symbol("COLUMN")  # type: ignore
-RELATIONSHIP: int = util.symbol("RELATIONSHIP")  # type: ignore
-REGISTRY: int = util.symbol("REGISTRY")  # type: ignore
-COLUMN_PROPERTY: int = util.symbol("COLUMN_PROPERTY")  # type: ignore
-TYPEENGINE: int = util.symbol("TYPEENGNE")  # type: ignore
-MAPPED: int = util.symbol("MAPPED")  # type: ignore
-DECLARATIVE_BASE: int = util.symbol("DECLARATIVE_BASE")  # type: ignore
-DECLARATIVE_META: int = util.symbol("DECLARATIVE_META")  # type: ignore
-MAPPED_DECORATOR: int = util.symbol("MAPPED_DECORATOR")  # type: ignore
-COLUMN_PROPERTY: int = util.symbol("COLUMN_PROPERTY")  # type: ignore
-SYNONYM_PROPERTY: int = util.symbol("SYNONYM_PROPERTY")  # type: ignore
-COMPOSITE_PROPERTY: int = util.symbol("COMPOSITE_PROPERTY")  # type: ignore
-DECLARED_ATTR: int = util.symbol("DECLARED_ATTR")  # type: ignore
-MAPPER_PROPERTY: int = util.symbol("MAPPER_PROPERTY")  # type: ignore
-AS_DECLARATIVE: int = util.symbol("AS_DECLARATIVE")  # type: ignore
-AS_DECLARATIVE_BASE: int = util.symbol("AS_DECLARATIVE_BASE")  # type: ignore
-DECLARATIVE_MIXIN: int = util.symbol("DECLARATIVE_MIXIN")  # type: ignore
-QUERY_EXPRESSION: int = util.symbol("QUERY_EXPRESSION")  # type: ignore
+COLUMN: int = util.symbol("COLUMN")
+RELATIONSHIP: int = util.symbol("RELATIONSHIP")
+REGISTRY: int = util.symbol("REGISTRY")
+COLUMN_PROPERTY: int = util.symbol("COLUMN_PROPERTY")
+TYPEENGINE: int = util.symbol("TYPEENGNE")
+MAPPED: int = util.symbol("MAPPED")
+DECLARATIVE_BASE: int = util.symbol("DECLARATIVE_BASE")
+DECLARATIVE_META: int = util.symbol("DECLARATIVE_META")
+MAPPED_DECORATOR: int = util.symbol("MAPPED_DECORATOR")
+SYNONYM_PROPERTY: int = util.symbol("SYNONYM_PROPERTY")
+COMPOSITE_PROPERTY: int = util.symbol("COMPOSITE_PROPERTY")
+DECLARED_ATTR: int = util.symbol("DECLARED_ATTR")
+MAPPER_PROPERTY: int = util.symbol("MAPPER_PROPERTY")
+AS_DECLARATIVE: int = util.symbol("AS_DECLARATIVE")
+AS_DECLARATIVE_BASE: int = util.symbol("AS_DECLARATIVE_BASE")
+DECLARATIVE_MIXIN: int = util.symbol("DECLARATIVE_MIXIN")
+QUERY_EXPRESSION: int = util.symbol("QUERY_EXPRESSION")
 
 # names that must succeed with mypy.api.named_type
 NAMED_TYPE_BUILTINS_OBJECT = "builtins.object"
 NAMED_TYPE_BUILTINS_STR = "builtins.str"
 NAMED_TYPE_BUILTINS_LIST = "builtins.list"
 NAMED_TYPE_SQLA_MAPPED = "sqlalchemy.orm.base.Mapped"
+
+_RelFullNames = {
+    "sqlalchemy.orm.relationships.Relationship",
+    "sqlalchemy.orm.relationships.RelationshipProperty",
+    "sqlalchemy.orm.relationships._RelationshipDeclared",
+    "sqlalchemy.orm.Relationship",
+    "sqlalchemy.orm.RelationshipProperty",
+}
 
 _lookup: Dict[str, Tuple[int, Set[str]]] = {
     "Column": (
@@ -67,24 +74,9 @@ _lookup: Dict[str, Tuple[int, Set[str]]] = {
             "sqlalchemy.sql.Column",
         },
     ),
-    "Relationship": (
-        RELATIONSHIP,
-        {
-            "sqlalchemy.orm.relationships.Relationship",
-            "sqlalchemy.orm.relationships.RelationshipProperty",
-            "sqlalchemy.orm.Relationship",
-            "sqlalchemy.orm.RelationshipProperty",
-        },
-    ),
-    "RelationshipProperty": (
-        RELATIONSHIP,
-        {
-            "sqlalchemy.orm.relationships.Relationship",
-            "sqlalchemy.orm.relationships.RelationshipProperty",
-            "sqlalchemy.orm.Relationship",
-            "sqlalchemy.orm.RelationshipProperty",
-        },
-    ),
+    "Relationship": (RELATIONSHIP, _RelFullNames),
+    "RelationshipProperty": (RELATIONSHIP, _RelFullNames),
+    "_RelationshipDeclared": (RELATIONSHIP, _RelFullNames),
     "registry": (
         REGISTRY,
         {

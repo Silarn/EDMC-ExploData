@@ -1,5 +1,5 @@
-# mysql/mysqldb.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/mysql/mysqldb.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -97,12 +97,7 @@ from ... import util
 
 
 class MySQLExecutionContext_mysqldb(MySQLExecutionContext):
-    @property
-    def rowcount(self):
-        if hasattr(self, "_rowcount"):
-            return self._rowcount
-        else:
-            return self.cursor.rowcount
+    pass
 
 
 class MySQLCompiler_mysqldb(MySQLCompiler):
@@ -168,7 +163,7 @@ class MySQLDialect_mysqldb(MySQLDialect):
         return on_connect
 
     def do_ping(self, dbapi_connection):
-        dbapi_connection.ping(False)
+        dbapi_connection.ping()
         return True
 
     def do_executemany(self, cursor, statement, parameters, context=None):

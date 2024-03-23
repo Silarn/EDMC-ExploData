@@ -1,4 +1,5 @@
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/oracle/cx_oracle.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -125,10 +126,15 @@ itself.  These options are always passed directly to :func:`_sa.create_engine`
 
 The parameters accepted by the cx_oracle dialect are as follows:
 
-* ``arraysize`` - set the cx_oracle.arraysize value on cursors, defaulted
-  to 50.  This setting is significant with cx_Oracle as the contents of LOB
-  objects are only readable within a "live" row (e.g. within a batch of
-  50 rows).
+* ``arraysize`` - set the cx_oracle.arraysize value on cursors; defaults
+  to ``None``, indicating that the driver default should be used (typically
+  the value is 100).  This setting controls how many rows are buffered when
+  fetching rows, and can have a significant effect on performance when
+  modified.   The setting is used for both ``cx_Oracle`` as well as
+  ``oracledb``.
+
+  .. versionchanged:: 2.0.26 - changed the default value from 50 to None,
+    to use the default value of the driver itself.
 
 * ``auto_convert_lobs`` - defaults to True; See :ref:`cx_oracle_lob`.
 
@@ -814,6 +820,8 @@ class OracleExecutionContext_cx_oracle(OracleExecutionContext):
 
                             out_parameters[name] = self.cursor.var(
                                 dbtype,
+                                # this is fine also in oracledb_async since
+                                # the driver will await the read coroutine
                                 outconverter=lambda value: value.read(),
                                 arraysize=len_params,
                             )
@@ -832,9 +840,9 @@ class OracleExecutionContext_cx_oracle(OracleExecutionContext):
                             )
 
                     for param in self.parameters:
-                        param[
-                            quoted_bind_names.get(name, name)
-                        ] = out_parameters[name]
+                        param[quoted_bind_names.get(name, name)] = (
+                            out_parameters[name]
+                        )
 
     def _generate_cursor_outputtype_handler(self):
         output_handlers = {}
@@ -978,8 +986,8 @@ class OracleDialect_cx_oracle(OracleDialect):
 
     driver = "cx_oracle"
 
-    colspecs = OracleDialect.colspecs
-    colspecs.update(
+    colspecs = util.update_copy(
+        OracleDialect.colspecs,
         {
             sqltypes.TIMESTAMP: _CXOracleTIMESTAMP,
             sqltypes.Numeric: _OracleNumeric,
@@ -1006,7 +1014,7 @@ class OracleDialect_cx_oracle(OracleDialect):
             sqltypes.Uuid: _OracleUUID,
             oracle.NCLOB: _OracleUnicodeTextNCLOB,
             oracle.ROWID: _OracleRowid,
-        }
+        },
     )
 
     execute_sequence_format = list
@@ -1030,7 +1038,7 @@ class OracleDialect_cx_oracle(OracleDialect):
         self,
         auto_convert_lobs=True,
         coerce_to_decimal=True,
-        arraysize=50,
+        arraysize=None,
         encoding_errors=None,
         threaded=None,
         **kwargs,
@@ -1088,9 +1096,9 @@ class OracleDialect_cx_oracle(OracleDialect):
                     int(x) for x in m.group(1, 2, 3) if x is not None
                 )
         self.cx_oracle_ver = version
-        if self.cx_oracle_ver < (7,) and self.cx_oracle_ver > (0, 0, 0):
+        if self.cx_oracle_ver < (8,) and self.cx_oracle_ver > (0, 0, 0):
             raise exc.InvalidRequestError(
-                "cx_Oracle version 7 and above are supported"
+                "cx_Oracle version 8 and above are supported"
             )
 
     @classmethod

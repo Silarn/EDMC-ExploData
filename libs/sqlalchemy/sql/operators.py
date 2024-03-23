@@ -1,5 +1,5 @@
 # sql/operators.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -77,8 +77,7 @@ class OperatorType(Protocol):
         right: Optional[Any] = None,
         *other: Any,
         **kwargs: Any,
-    ) -> ColumnElement[Any]:
-        ...
+    ) -> ColumnElement[Any]: ...
 
     @overload
     def __call__(
@@ -87,8 +86,7 @@ class OperatorType(Protocol):
         right: Optional[Any] = None,
         *other: Any,
         **kwargs: Any,
-    ) -> Operators:
-        ...
+    ) -> Operators: ...
 
     def __call__(
         self,
@@ -96,8 +94,7 @@ class OperatorType(Protocol):
         right: Optional[Any] = None,
         *other: Any,
         **kwargs: Any,
-    ) -> Operators:
-        ...
+    ) -> Operators: ...
 
 
 add = cast(OperatorType, _uncast_add)
@@ -307,7 +304,7 @@ class Operators:
         )
 
         def against(other: Any) -> Operators:
-            return operator(self, other)  # type: ignore
+            return operator(self, other)
 
         return against
 
@@ -466,8 +463,7 @@ class custom_op(OperatorType, Generic[_T]):
         right: Optional[Any] = None,
         *other: Any,
         **kwargs: Any,
-    ) -> ColumnElement[Any]:
-        ...
+    ) -> ColumnElement[Any]: ...
 
     @overload
     def __call__(
@@ -476,8 +472,7 @@ class custom_op(OperatorType, Generic[_T]):
         right: Optional[Any] = None,
         *other: Any,
         **kwargs: Any,
-    ) -> Operators:
-        ...
+    ) -> Operators: ...
 
     def __call__(
         self,
@@ -545,13 +540,11 @@ class ColumnOperators(Operators):
 
         def operate(
             self, op: OperatorType, *other: Any, **kwargs: Any
-        ) -> ColumnOperators:
-            ...
+        ) -> ColumnOperators: ...
 
         def reverse_operate(
             self, op: OperatorType, other: Any, **kwargs: Any
-        ) -> ColumnOperators:
-            ...
+        ) -> ColumnOperators: ...
 
     def __lt__(self, other: Any) -> ColumnOperators:
         """Implement the ``<`` operator.
@@ -569,8 +562,15 @@ class ColumnOperators(Operators):
         """
         return self.operate(le, other)
 
-    # TODO: not sure why we have this
-    __hash__ = Operators.__hash__  # type: ignore
+    # ColumnOperators defines an __eq__ so it must explicitly declare also
+    # an hash or it's set to None by python:
+    # https://docs.python.org/3/reference/datamodel.html#object.__hash__
+    if TYPE_CHECKING:
+
+        def __hash__(self) -> int: ...
+
+    else:
+        __hash__ = Operators.__hash__
 
     def __eq__(self, other: Any) -> ColumnOperators:  # type: ignore[override]
         """Implement the ``==`` operator.
@@ -615,8 +615,7 @@ class ColumnOperators(Operators):
     # deprecated 1.4; see #5435
     if TYPE_CHECKING:
 
-        def isnot_distinct_from(self, other: Any) -> ColumnOperators:
-            ...
+        def isnot_distinct_from(self, other: Any) -> ColumnOperators: ...
 
     else:
         isnot_distinct_from = is_not_distinct_from
@@ -956,8 +955,7 @@ class ColumnOperators(Operators):
     # deprecated 1.4; see #5429
     if TYPE_CHECKING:
 
-        def notin_(self, other: Any) -> ColumnOperators:
-            ...
+        def notin_(self, other: Any) -> ColumnOperators: ...
 
     else:
         notin_ = not_in
@@ -986,8 +984,7 @@ class ColumnOperators(Operators):
 
         def notlike(
             self, other: Any, escape: Optional[str] = None
-        ) -> ColumnOperators:
-            ...
+        ) -> ColumnOperators: ...
 
     else:
         notlike = not_like
@@ -1016,8 +1013,7 @@ class ColumnOperators(Operators):
 
         def notilike(
             self, other: Any, escape: Optional[str] = None
-        ) -> ColumnOperators:
-            ...
+        ) -> ColumnOperators: ...
 
     else:
         notilike = not_ilike
@@ -1055,8 +1051,7 @@ class ColumnOperators(Operators):
     # deprecated 1.4; see #5429
     if TYPE_CHECKING:
 
-        def isnot(self, other: Any) -> ColumnOperators:
-            ...
+        def isnot(self, other: Any) -> ColumnOperators: ...
 
     else:
         isnot = is_not
@@ -1720,8 +1715,7 @@ class ColumnOperators(Operators):
     # deprecated 1.4; see #5435
     if TYPE_CHECKING:
 
-        def nullsfirst(self) -> ColumnOperators:
-            ...
+        def nullsfirst(self) -> ColumnOperators: ...
 
     else:
         nullsfirst = nulls_first
@@ -1739,8 +1733,7 @@ class ColumnOperators(Operators):
     # deprecated 1.4; see #5429
     if TYPE_CHECKING:
 
-        def nullslast(self) -> ColumnOperators:
-            ...
+        def nullslast(self) -> ColumnOperators: ...
 
     else:
         nullslast = nulls_last
@@ -1811,10 +1804,10 @@ class ColumnOperators(Operators):
         See the documentation for :func:`_sql.any_` for examples.
 
         .. note:: be sure to not confuse the newer
-            :meth:`_sql.ColumnOperators.any_` method with its older
-            :class:`_types.ARRAY`-specific counterpart, the
-            :meth:`_types.ARRAY.Comparator.any` method, which a different
-            calling syntax and usage pattern.
+            :meth:`_sql.ColumnOperators.any_` method with the **legacy**
+            version of this method, the :meth:`_types.ARRAY.Comparator.any`
+            method that's specific to :class:`_types.ARRAY`, which uses a
+            different calling style.
 
         """
         return self.operate(any_op)
@@ -1826,10 +1819,10 @@ class ColumnOperators(Operators):
         See the documentation for :func:`_sql.all_` for examples.
 
         .. note:: be sure to not confuse the newer
-            :meth:`_sql.ColumnOperators.all_` method with its older
-            :class:`_types.ARRAY`-specific counterpart, the
-            :meth:`_types.ARRAY.Comparator.all` method, which a different
-            calling syntax and usage pattern.
+            :meth:`_sql.ColumnOperators.all_` method with the **legacy**
+            version of this method, the :meth:`_types.ARRAY.Comparator.all`
+            method that's specific to :class:`_types.ARRAY`, which uses a
+            different calling style.
 
         """
         return self.operate(all_op)
@@ -1960,8 +1953,7 @@ def is_true(a: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def istrue(a: Any) -> Any:
-        ...
+    def istrue(a: Any) -> Any: ...
 
 else:
     istrue = is_true
@@ -1976,8 +1968,7 @@ def is_false(a: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def isfalse(a: Any) -> Any:
-        ...
+    def isfalse(a: Any) -> Any: ...
 
 else:
     isfalse = is_false
@@ -1999,8 +1990,7 @@ def is_not_distinct_from(a: Any, b: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def isnot_distinct_from(a: Any, b: Any) -> Any:
-        ...
+    def isnot_distinct_from(a: Any, b: Any) -> Any: ...
 
 else:
     isnot_distinct_from = is_not_distinct_from
@@ -2022,8 +2012,7 @@ def is_not(a: Any, b: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def isnot(a: Any, b: Any) -> Any:
-        ...
+    def isnot(a: Any, b: Any) -> Any: ...
 
 else:
     isnot = is_not
@@ -2055,8 +2044,7 @@ def not_like_op(a: Any, b: Any, escape: Optional[str] = None) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def notlike_op(a: Any, b: Any, escape: Optional[str] = None) -> Any:
-        ...
+    def notlike_op(a: Any, b: Any, escape: Optional[str] = None) -> Any: ...
 
 else:
     notlike_op = not_like_op
@@ -2078,8 +2066,7 @@ def not_ilike_op(a: Any, b: Any, escape: Optional[str] = None) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def notilike_op(a: Any, b: Any, escape: Optional[str] = None) -> Any:
-        ...
+    def notilike_op(a: Any, b: Any, escape: Optional[str] = None) -> Any: ...
 
 else:
     notilike_op = not_ilike_op
@@ -2101,8 +2088,9 @@ def not_between_op(a: Any, b: Any, c: Any, symmetric: bool = False) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def notbetween_op(a: Any, b: Any, c: Any, symmetric: bool = False) -> Any:
-        ...
+    def notbetween_op(
+        a: Any, b: Any, c: Any, symmetric: bool = False
+    ) -> Any: ...
 
 else:
     notbetween_op = not_between_op
@@ -2124,8 +2112,7 @@ def not_in_op(a: Any, b: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def notin_op(a: Any, b: Any) -> Any:
-        ...
+    def notin_op(a: Any, b: Any) -> Any: ...
 
 else:
     notin_op = not_in_op
@@ -2190,8 +2177,7 @@ if TYPE_CHECKING:
     @_operator_fn
     def notstartswith_op(
         a: Any, b: Any, escape: Optional[str] = None, autoescape: bool = False
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 else:
     notstartswith_op = not_startswith_op
@@ -2235,8 +2221,7 @@ if TYPE_CHECKING:
     @_operator_fn
     def notendswith_op(
         a: Any, b: Any, escape: Optional[str] = None, autoescape: bool = False
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 else:
     notendswith_op = not_endswith_op
@@ -2280,8 +2265,7 @@ if TYPE_CHECKING:
     @_operator_fn
     def notcontains_op(
         a: Any, b: Any, escape: Optional[str] = None, autoescape: bool = False
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 else:
     notcontains_op = not_contains_op
@@ -2338,8 +2322,7 @@ def not_match_op(a: Any, b: Any, **kw: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def notmatch_op(a: Any, b: Any, **kw: Any) -> Any:
-        ...
+    def notmatch_op(a: Any, b: Any, **kw: Any) -> Any: ...
 
 else:
     notmatch_op = not_match_op
@@ -2384,8 +2367,7 @@ def nulls_first_op(a: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def nullsfirst_op(a: Any) -> Any:
-        ...
+    def nullsfirst_op(a: Any) -> Any: ...
 
 else:
     nullsfirst_op = nulls_first_op
@@ -2400,8 +2382,7 @@ def nulls_last_op(a: Any) -> Any:
 if TYPE_CHECKING:
 
     @_operator_fn
-    def nullslast_op(a: Any) -> Any:
-        ...
+    def nullslast_op(a: Any) -> Any: ...
 
 else:
     nullslast_op = nulls_last_op
@@ -2533,8 +2514,8 @@ _PRECEDENCE: Dict[OperatorType, int] = {
     bitwise_and_op: 7,
     bitwise_lshift_op: 7,
     bitwise_rshift_op: 7,
-    concat_op: 6,
     filter_op: 6,
+    concat_op: 5,
     match_op: 5,
     not_match_op: 5,
     regexp_match_op: 5,
@@ -2574,9 +2555,13 @@ _PRECEDENCE: Dict[OperatorType, int] = {
 }
 
 
-def is_precedent(operator: OperatorType, against: OperatorType) -> bool:
+def is_precedent(
+    operator: OperatorType, against: Optional[OperatorType]
+) -> bool:
     if operator is against and is_natural_self_precedent(operator):
         return False
+    elif against is None:
+        return True
     else:
         return bool(
             _PRECEDENCE.get(

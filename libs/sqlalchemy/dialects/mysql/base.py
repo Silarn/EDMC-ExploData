@@ -1,5 +1,5 @@
-# mysql/base.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/mysql/base.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -999,14 +999,14 @@ output::
     )
 
 """  # noqa
+from __future__ import annotations
 
 from array import array as _array
 from collections import defaultdict
 from itertools import compress
 import re
+from typing import cast
 
-from sqlalchemy import literal_column
-from sqlalchemy.sql import visitors
 from . import reflection as _reflection
 from .enumerated import ENUM
 from .enumerated import SET
@@ -1047,10 +1047,12 @@ from .types import TINYTEXT
 from .types import VARCHAR
 from .types import YEAR
 from ... import exc
+from ... import literal_column
 from ... import log
 from ... import schema as sa_schema
 from ... import sql
 from ... import util
+from ...engine import cursor as _cursor
 from ...engine import default
 from ...engine import reflection
 from ...engine.reflection import ReflectionDefaults
@@ -1062,7 +1064,10 @@ from ...sql import operators
 from ...sql import roles
 from ...sql import sqltypes
 from ...sql import util as sql_util
+from ...sql import visitors
 from ...sql.compiler import InsertmanyvaluesSentinelOpts
+from ...sql.compiler import SQLCompiler
+from ...sql.schema import SchemaConst
 from ...types import BINARY
 from ...types import BLOB
 from ...types import BOOLEAN
@@ -1070,6 +1075,7 @@ from ...types import DATE
 from ...types import UUID
 from ...types import VARBINARY
 from ...util import topological
+
 
 SET_RE = re.compile(
     r"\s*SET\s+(?:(?:GLOBAL|SESSION)\s+)?\w", re.I | re.UNICODE
@@ -1164,6 +1170,32 @@ ischema_names = {
 
 
 class MySQLExecutionContext(default.DefaultExecutionContext):
+    def post_exec(self):
+        if (
+            self.isdelete
+            and cast(SQLCompiler, self.compiled).effective_returning
+            and not self.cursor.description
+        ):
+            # All MySQL/mariadb drivers appear to not include
+            # cursor.description for DELETE..RETURNING with no rows if the
+            # WHERE criteria is a straight "false" condition such as our EMPTY
+            # IN condition. manufacture an empty result in this case (issue
+            # #10505)
+            #
+            # taken from cx_Oracle implementation
+            self.cursor_fetch_strategy = (
+                _cursor.FullyBufferedCursorFetchStrategy(
+                    self.cursor,
+                    [
+                        (entry.keyname, None)
+                        for entry in cast(
+                            SQLCompiler, self.compiled
+                        )._result_columns
+                    ],
+                    [],
+                )
+            )
+
     def create_server_side_cursor(self):
         if self.dialect.supports_server_side_cursors:
             return self._dbapi_connection.cursor(self.dialect._sscursor)
@@ -1207,6 +1239,12 @@ class MySQLCompiler(compiler.SQLCompiler):
             elem._compiler_dispatch(self, **kw) for elem in fn.clauses
         )
         return f"{clause} WITH ROLLUP"
+
+    def visit_aggregate_strings_func(self, fn, **kw):
+        expr, delimeter = (
+            elem._compiler_dispatch(self, **kw) for elem in fn.clauses
+        )
+        return f"group_concat({expr} SEPARATOR {delimeter})"
 
     def visit_sequence(self, seq, **kw):
         return "nextval(%s)" % self.preparer.format_sequence(seq)
@@ -1533,7 +1571,7 @@ class MySQLCompiler(compiler.SQLCompiler):
     def get_select_precolumns(self, select, **kw):
         """Add special MySQL keywords in place of DISTINCT.
 
-        .. deprecated 1.4:: this usage is deprecated.
+        .. deprecated:: 1.4  This usage is deprecated.
            :meth:`_expression.Select.prefix_with` should be used for special
            keywords at the start of a SELECT.
 
@@ -1760,7 +1798,12 @@ class MySQLCompiler(compiler.SQLCompiler):
 class MySQLDDLCompiler(compiler.DDLCompiler):
     def get_column_specification(self, column, **kw):
         """Builds column DDL."""
-
+        if (
+            self.dialect.is_mariadb is True
+            and column.computed is not None
+            and column._user_defined_nullable is SchemaConst.NULL_UNSPECIFIED
+        ):
+            column.nullable = True
         colspec = [
             self.preparer.format_column(column),
             self.dialect.type_compiler_instance.process(
@@ -1902,17 +1945,19 @@ class MySQLDDLCompiler(compiler.DDLCompiler):
 
         columns = [
             self.sql_compiler.process(
-                elements.Grouping(expr)
-                if (
-                    isinstance(expr, elements.BinaryExpression)
-                    or (
-                        isinstance(expr, elements.UnaryExpression)
-                        and expr.modifier
-                        not in (operators.desc_op, operators.asc_op)
+                (
+                    elements.Grouping(expr)
+                    if (
+                        isinstance(expr, elements.BinaryExpression)
+                        or (
+                            isinstance(expr, elements.UnaryExpression)
+                            and expr.modifier
+                            not in (operators.desc_op, operators.asc_op)
+                        )
+                        or isinstance(expr, functions.FunctionElement)
                     )
-                    or isinstance(expr, functions.FunctionElement)
-                )
-                else expr,
+                    else expr
+                ),
                 include_table=False,
                 literal_binds=True,
             )
@@ -1941,12 +1986,14 @@ class MySQLDDLCompiler(compiler.DDLCompiler):
                 # mapping specifying the prefix length for each column of the
                 # index
                 columns = ", ".join(
-                    "%s(%d)" % (expr, length[col.name])
-                    if col.name in length
-                    else (
-                        "%s(%d)" % (expr, length[expr])
-                        if expr in length
-                        else "%s" % expr
+                    (
+                        "%s(%d)" % (expr, length[col.name])
+                        if col.name in length
+                        else (
+                            "%s(%d)" % (expr, length[expr])
+                            if expr in length
+                            else "%s" % expr
+                        )
                     )
                     for col, expr in zip(index.expressions, columns)
                 )

@@ -1,5 +1,5 @@
-# postgresql/psycopg2.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/postgresql/psycopg.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -78,6 +78,8 @@ from ...util.concurrency import await_only
 
 if TYPE_CHECKING:
     from typing import Iterable
+
+    from psycopg import AsyncConnection
 
 logger = logging.getLogger("sqlalchemy.dialects.postgresql")
 
@@ -162,7 +164,7 @@ class _PGBoolean(sqltypes.Boolean):
     render_bind_cast = True
 
 
-class _PsycopgRange(ranges.AbstractRangeImpl):
+class _PsycopgRange(ranges.AbstractSingleRangeImpl):
     def bind_processor(self, dialect):
         psycopg_Range = cast(PGDialect_psycopg, dialect)._psycopg_Range
 
@@ -218,8 +220,10 @@ class _PsycopgMultiRange(ranges.AbstractMultiRangeImpl):
 
     def result_processor(self, dialect, coltype):
         def to_range(value):
-            if value is not None:
-                value = [
+            if value is None:
+                return None
+            else:
+                return ranges.MultiRange(
                     ranges.Range(
                         elem._lower,
                         elem._upper,
@@ -227,9 +231,7 @@ class _PsycopgMultiRange(ranges.AbstractMultiRangeImpl):
                         empty=not elem._bounds,
                     )
                     for elem in value
-                ]
-
-            return value
+                )
 
         return to_range
 
@@ -286,7 +288,7 @@ class PGDialect_psycopg(_PGDialect_common_psycopg):
             sqltypes.Integer: _PGInteger,
             sqltypes.SmallInteger: _PGSmallInteger,
             sqltypes.BigInteger: _PGBigInteger,
-            ranges.AbstractRange: _PsycopgRange,
+            ranges.AbstractSingleRange: _PsycopgRange,
             ranges.AbstractMultiRange: _PsycopgMultiRange,
         },
     )
@@ -619,6 +621,7 @@ class AsyncAdapt_psycopg_ss_cursor(AsyncAdapt_psycopg_cursor):
 
 
 class AsyncAdapt_psycopg_connection(AdaptedConnection):
+    _connection: AsyncConnection
     __slots__ = ()
     await_ = staticmethod(await_only)
 

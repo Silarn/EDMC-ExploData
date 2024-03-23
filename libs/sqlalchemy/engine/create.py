@@ -1,5 +1,5 @@
 # engine/create.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -82,13 +82,11 @@ def create_engine(
     query_cache_size: int = ...,
     use_insertmanyvalues: bool = ...,
     **kwargs: Any,
-) -> Engine:
-    ...
+) -> Engine: ...
 
 
 @overload
-def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine:
-    ...
+def create_engine(url: Union[str, URL], **kwargs: Any) -> Engine: ...
 
 
 @util.deprecated_params(
@@ -616,6 +614,14 @@ def create_engine(url: Union[str, _url.URL], **kwargs: Any) -> Engine:
     # assemble connection arguments
     (cargs_tup, cparams) = dialect.create_connect_args(u)
     cparams.update(pop_kwarg("connect_args", {}))
+
+    if "async_fallback" in cparams and util.asbool(cparams["async_fallback"]):
+        util.warn_deprecated(
+            "The async_fallback dialect argument is deprecated and will be "
+            "removed in SQLAlchemy 2.1.",
+            "2.0",
+        )
+
     cargs = list(cargs_tup)  # allow mutability
 
     # look for existing pool or create
@@ -656,6 +662,17 @@ def create_engine(url: Union[str, _url.URL], **kwargs: Any) -> Engine:
         pool = poolclass(creator, **pool_args)
     else:
         pool._dialect = dialect
+
+    if (
+        hasattr(pool, "_is_asyncio")
+        and pool._is_asyncio is not dialect.is_async
+    ):
+        raise exc.ArgumentError(
+            f"Pool class {pool.__class__.__name__} cannot be "
+            f"used with {'non-' if not dialect.is_async else ''}"
+            "asyncio engine",
+            code="pcls",
+        )
 
     # create engine.
     if not pop_kwarg("future", True):
@@ -816,13 +833,11 @@ def create_pool_from_url(
     timeout: float = ...,
     use_lifo: bool = ...,
     **kwargs: Any,
-) -> Pool:
-    ...
+) -> Pool: ...
 
 
 @overload
-def create_pool_from_url(url: Union[str, URL], **kwargs: Any) -> Pool:
-    ...
+def create_pool_from_url(url: Union[str, URL], **kwargs: Any) -> Pool: ...
 
 
 def create_pool_from_url(url: Union[str, URL], **kwargs: Any) -> Pool:

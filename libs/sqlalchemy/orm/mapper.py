@@ -1,5 +1,5 @@
 # orm/mapper.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -132,9 +132,9 @@ _WithPolymorphicArg = Union[
 ]
 
 
-_mapper_registries: weakref.WeakKeyDictionary[
-    _RegistryType, bool
-] = weakref.WeakKeyDictionary()
+_mapper_registries: weakref.WeakKeyDictionary[_RegistryType, bool] = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def _all_registries() -> Set[registry]:
@@ -786,7 +786,7 @@ class Mapper(
 
         # interim - polymorphic_on is further refined in
         # _configure_polymorphic_setter
-        self.polymorphic_on = (  # type: ignore
+        self.polymorphic_on = (
             coercions.expect(  # type: ignore
                 roles.ColumnArgumentOrKeyRole,
                 polymorphic_on,
@@ -964,8 +964,8 @@ class Mapper(
     version_id_generator: Optional[Union[Literal[False], Callable[[Any], Any]]]
 
     local_table: FromClause
-    """The immediate :class:`_expression.FromClause` which this
-    :class:`_orm.Mapper` refers towards.
+    """The immediate :class:`_expression.FromClause` to which this
+    :class:`_orm.Mapper` refers.
 
     Typically is an instance of :class:`_schema.Table`, may be any
     :class:`.FromClause`.
@@ -1400,7 +1400,7 @@ class Mapper(
             self.with_polymorphic = None
 
         if self.with_polymorphic and self.with_polymorphic[1] is not None:
-            self.with_polymorphic = (  # type: ignore
+            self.with_polymorphic = (
                 self.with_polymorphic[0],
                 coercions.expect(
                     roles.StrictFromClauseRole,
@@ -1504,7 +1504,7 @@ class Mapper(
         manager = instrumentation.register_class(
             self.class_,
             mapper=self,
-            expired_attribute_loader=util.partial(  # type: ignore
+            expired_attribute_loader=util.partial(
                 loading.load_scalar_attributes, self
             ),
             # finalize flag means instrument the __init__ method
@@ -1606,11 +1606,13 @@ class Mapper(
 
         if self._primary_key_argument:
             coerced_pk_arg = [
-                self._str_arg_to_mapped_col("primary_key", c)
-                if isinstance(c, str)
-                else c
+                (
+                    self._str_arg_to_mapped_col("primary_key", c)
+                    if isinstance(c, str)
+                    else c
+                )
                 for c in (
-                    coercions.expect(  # type: ignore
+                    coercions.expect(
                         roles.DDLConstraintColumnRole,
                         coerce_pk,
                         argname="primary_key",
@@ -2465,9 +2467,11 @@ class Mapper(
         return "Mapper[%s%s(%s)]" % (
             self.class_.__name__,
             self.non_primary and " (non-primary)" or "",
-            self.local_table.description
-            if self.local_table is not None
-            else self.persist_selectable.description,
+            (
+                self.local_table.description
+                if self.local_table is not None
+                else self.persist_selectable.description
+            ),
         )
 
     def _is_orphan(self, state: InstanceState[_O]) -> bool:
@@ -4097,7 +4101,7 @@ class _OptGetColumnsNotAvailable(Exception):
     pass
 
 
-def configure_mappers():
+def configure_mappers() -> None:
     """Initialize the inter-mapper relationships of all mappers that
     have been constructed thus far across all :class:`_orm.registry`
     collections.

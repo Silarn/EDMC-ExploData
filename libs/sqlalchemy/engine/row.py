@@ -1,5 +1,5 @@
 # engine/row.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -213,15 +213,12 @@ class Row(BaseRow, Sequence[Any], Generic[_TP]):
     if TYPE_CHECKING:
 
         @overload
-        def __getitem__(self, index: int) -> Any:
-            ...
+        def __getitem__(self, index: int) -> Any: ...
 
         @overload
-        def __getitem__(self, index: slice) -> Sequence[Any]:
-            ...
+        def __getitem__(self, index: slice) -> Sequence[Any]: ...
 
-        def __getitem__(self, index: Union[int, slice]) -> Any:
-            ...
+        def __getitem__(self, index: Union[int, slice]) -> Any: ...
 
     def __lt__(self, other: Any) -> bool:
         return self._op(other, operator.lt)
@@ -296,8 +293,8 @@ class ROMappingView(ABC):
     def __init__(
         self, mapping: Mapping["_KeyType", Any], items: Sequence[Any]
     ):
-        self._mapping = mapping
-        self._items = items
+        self._mapping = mapping  # type: ignore[misc]
+        self._items = items  # type: ignore[misc]
 
     def __len__(self) -> int:
         return len(self._items)
@@ -321,11 +318,11 @@ class ROMappingView(ABC):
 class ROMappingKeysValuesView(
     ROMappingView, typing.KeysView["_KeyType"], typing.ValuesView[Any]
 ):
-    __slots__ = ("_items",)
+    __slots__ = ("_items",)  # mapping slot is provided by KeysView
 
 
 class ROMappingItemsView(ROMappingView, typing.ItemsView["_KeyType", Any]):
-    __slots__ = ("_items",)
+    __slots__ = ("_items",)  # mapping slot is provided by ItemsView
 
 
 class RowMapping(BaseRow, typing.Mapping["_KeyType", Any]):
@@ -359,8 +356,7 @@ class RowMapping(BaseRow, typing.Mapping["_KeyType", Any]):
 
     if TYPE_CHECKING:
 
-        def __getitem__(self, key: _KeyType) -> Any:
-            ...
+        def __getitem__(self, key: _KeyType) -> Any: ...
 
     else:
         __getitem__ = BaseRow._get_by_key_impl_mapping

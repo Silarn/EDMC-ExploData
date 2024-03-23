@@ -1,5 +1,5 @@
 # sql/annotation.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -67,16 +67,14 @@ class SupportsAnnotations(ExternallyTraversible):
         self,
         values: Literal[None] = ...,
         clone: bool = ...,
-    ) -> Self:
-        ...
+    ) -> Self: ...
 
     @overload
     def _deannotate(
         self,
         values: Sequence[str] = ...,
         clone: bool = ...,
-    ) -> SupportsAnnotations:
-        ...
+    ) -> SupportsAnnotations: ...
 
     def _deannotate(
         self,
@@ -99,9 +97,11 @@ class SupportsAnnotations(ExternallyTraversible):
             tuple(
                 (
                     key,
-                    value._gen_cache_key(anon_map, [])
-                    if isinstance(value, HasCacheKey)
-                    else value,
+                    (
+                        value._gen_cache_key(anon_map, [])
+                        if isinstance(value, HasCacheKey)
+                        else value
+                    ),
                 )
                 for key, value in [
                     (key, self._annotations[key])
@@ -119,8 +119,7 @@ class SupportsWrappingAnnotations(SupportsAnnotations):
     if TYPE_CHECKING:
 
         @util.ro_non_memoized_property
-        def entity_namespace(self) -> _EntityNamespace:
-            ...
+        def entity_namespace(self) -> _EntityNamespace: ...
 
     def _annotate(self, values: _AnnotationDict) -> Self:
         """return a copy of this ClauseElement with annotations
@@ -141,16 +140,14 @@ class SupportsWrappingAnnotations(SupportsAnnotations):
         self,
         values: Literal[None] = ...,
         clone: bool = ...,
-    ) -> Self:
-        ...
+    ) -> Self: ...
 
     @overload
     def _deannotate(
         self,
         values: Sequence[str] = ...,
         clone: bool = ...,
-    ) -> SupportsAnnotations:
-        ...
+    ) -> SupportsAnnotations: ...
 
     def _deannotate(
         self,
@@ -214,16 +211,14 @@ class SupportsCloneAnnotations(SupportsWrappingAnnotations):
         self,
         values: Literal[None] = ...,
         clone: bool = ...,
-    ) -> Self:
-        ...
+    ) -> Self: ...
 
     @overload
     def _deannotate(
         self,
         values: Sequence[str] = ...,
         clone: bool = ...,
-    ) -> SupportsAnnotations:
-        ...
+    ) -> SupportsAnnotations: ...
 
     def _deannotate(
         self,
@@ -300,7 +295,7 @@ class Annotated(SupportsAnnotations):
 
     def _annotate(self, values: _AnnotationDict) -> Self:
         _values = self._annotations.union(values)
-        new = self._with_annotations(_values)  # type: ignore
+        new = self._with_annotations(_values)
         return new
 
     def _with_annotations(self, values: _AnnotationDict) -> Self:
@@ -316,16 +311,14 @@ class Annotated(SupportsAnnotations):
         self,
         values: Literal[None] = ...,
         clone: bool = ...,
-    ) -> Self:
-        ...
+    ) -> Self: ...
 
     @overload
     def _deannotate(
         self,
         values: Sequence[str] = ...,
         clone: bool = ...,
-    ) -> Annotated:
-        ...
+    ) -> Annotated: ...
 
     def _deannotate(
         self,
@@ -395,9 +388,9 @@ class Annotated(SupportsAnnotations):
 # so that the resulting objects are pickleable; additionally, other
 # decisions can be made up front about the type of object being annotated
 # just once per class rather than per-instance.
-annotated_classes: Dict[
-    Type[SupportsWrappingAnnotations], Type[Annotated]
-] = {}
+annotated_classes: Dict[Type[SupportsWrappingAnnotations], Type[Annotated]] = (
+    {}
+)
 
 _SA = TypeVar("_SA", bound="SupportsAnnotations")
 
@@ -487,15 +480,13 @@ def _deep_annotate(
 @overload
 def _deep_deannotate(
     element: Literal[None], values: Optional[Sequence[str]] = None
-) -> Literal[None]:
-    ...
+) -> Literal[None]: ...
 
 
 @overload
 def _deep_deannotate(
     element: _SA, values: Optional[Sequence[str]] = None
-) -> _SA:
-    ...
+) -> _SA: ...
 
 
 def _deep_deannotate(

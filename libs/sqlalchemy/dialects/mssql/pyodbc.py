@@ -1,5 +1,5 @@
-# mssql/pyodbc.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# dialects/mssql/pyodbc.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -365,10 +365,10 @@ from ... import exc
 from ... import types as sqltypes
 from ... import util
 from ...connectors.pyodbc import PyODBCConnector
+from ...engine import cursor as _cursor
 
 
 class _ms_numeric_pyodbc:
-
     """Turns Decimals with adjusted() < 0 or > 7 into strings.
 
     The routines here are needed for older pyodbc versions
@@ -585,14 +585,22 @@ class MSExecutionContext_pyodbc(MSExecutionContext):
                 try:
                     # fetchall() ensures the cursor is consumed
                     # without closing it (FreeTDS particularly)
-                    row = self.cursor.fetchall()[0]
-                    break
+                    rows = self.cursor.fetchall()
                 except self.dialect.dbapi.Error:
                     # no way around this - nextset() consumes the previous set
                     # so we need to just keep flipping
                     self.cursor.nextset()
+                else:
+                    if not rows:
+                        # async adapter drivers just return None here
+                        self.cursor.nextset()
+                        continue
+                    row = rows[0]
+                    break
 
             self._lastrowid = int(row[0])
+
+            self.cursor_fetch_strategy = _cursor._NO_CURSOR_DML
         else:
             super().post_exec()
 

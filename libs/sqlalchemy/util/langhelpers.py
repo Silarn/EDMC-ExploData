@@ -1,5 +1,5 @@
 # util/langhelpers.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -15,7 +15,6 @@ from __future__ import annotations
 import collections
 import enum
 from functools import update_wrapper
-import hashlib
 import inspect
 import itertools
 import operator
@@ -87,9 +86,9 @@ else:
 
 def md5_hex(x: Any) -> str:
     x = x.encode("utf-8")
-    m = hashlib.md5()
+    m = compat.md5_not_for_security()
     m.update(x)
-    return m.hexdigest()
+    return cast(str, m.hexdigest())
 
 
 class safe_reraise:
@@ -175,10 +174,11 @@ def string_or_unprintable(element: Any) -> str:
             return "unprintable element %r" % element
 
 
-def clsname_as_plain_name(cls: Type[Any]) -> str:
-    return " ".join(
-        n.lower() for n in re.findall(r"([A-Z][a-z]+|SQL)", cls.__name__)
-    )
+def clsname_as_plain_name(
+    cls: Type[Any], use_name: Optional[str] = None
+) -> str:
+    name = use_name or cls.__name__
+    return " ".join(n.lower() for n in re.findall(r"([A-Z][a-z]+|SQL)", name))
 
 
 def method_is_overridden(
@@ -266,6 +266,13 @@ def decorator(target: Callable[..., Any]) -> Callable[[_Fn], _Fn]:
         metadata.update(format_argspec_plus(spec, grouped=False))
         metadata["name"] = fn.__name__
 
+        if inspect.iscoroutinefunction(fn):
+            metadata["prefix"] = "async "
+            metadata["target_prefix"] = "await "
+        else:
+            metadata["prefix"] = ""
+            metadata["target_prefix"] = ""
+
         # look for __ positional arguments.  This is a convention in
         # SQLAlchemy that arguments should be passed positionally
         # rather than as keyword
@@ -277,16 +284,16 @@ def decorator(target: Callable[..., Any]) -> Callable[[_Fn], _Fn]:
         if "__" in repr(spec[0]):
             code = (
                 """\
-def %(name)s%(grouped_args)s:
-    return %(target)s(%(fn)s, %(apply_pos)s)
+%(prefix)sdef %(name)s%(grouped_args)s:
+    return %(target_prefix)s%(target)s(%(fn)s, %(apply_pos)s)
 """
                 % metadata
             )
         else:
             code = (
                 """\
-def %(name)s%(grouped_args)s:
-    return %(target)s(%(fn)s, %(apply_kw)s)
+%(prefix)sdef %(name)s%(grouped_args)s:
+    return %(target_prefix)s%(target)s(%(fn)s, %(apply_kw)s)
 """
                 % metadata
             )
@@ -405,15 +412,13 @@ def get_cls_kwargs(
     *,
     _set: Optional[Set[str]] = None,
     raiseerr: Literal[True] = ...,
-) -> Set[str]:
-    ...
+) -> Set[str]: ...
 
 
 @overload
 def get_cls_kwargs(
     cls: type, *, _set: Optional[Set[str]] = None, raiseerr: bool = False
-) -> Optional[Set[str]]:
-    ...
+) -> Optional[Set[str]]: ...
 
 
 def get_cls_kwargs(
@@ -526,12 +531,10 @@ def get_callable_argspec(
             fn.__init__, no_self=no_self, _is_init=True
         )
     elif hasattr(fn, "__func__"):
-        return compat.inspect_getfullargspec(fn.__func__)  # type: ignore[attr-defined] # noqa: E501
+        return compat.inspect_getfullargspec(fn.__func__)
     elif hasattr(fn, "__call__"):
-        if inspect.ismethod(fn.__call__):  # type: ignore [operator]
-            return get_callable_argspec(
-                fn.__call__, no_self=no_self  # type: ignore [operator]
-            )
+        if inspect.ismethod(fn.__call__):
+            return get_callable_argspec(fn.__call__, no_self=no_self)
         else:
             raise TypeError("Can't inspect callable: %s" % fn)
     else:
@@ -693,6 +696,7 @@ def create_proxy_methods(
     classmethods: Sequence[str] = (),
     methods: Sequence[str] = (),
     attributes: Sequence[str] = (),
+    use_intermediate_variable: Sequence[str] = (),
 ) -> Callable[[_T], _T]:
     """A class decorator indicating attributes should refer to a proxy
     class.
@@ -1082,28 +1086,24 @@ class generic_fn_descriptor(Generic[_T_co]):
     __name__: str
 
     def __init__(self, fget: Callable[..., _T_co], doc: Optional[str] = None):
-        self.fget = fget  # type: ignore[assignment]
+        self.fget = fget
         self.__doc__ = doc or fget.__doc__
         self.__name__ = fget.__name__
 
     @overload
-    def __get__(self: _GFD, obj: None, cls: Any) -> _GFD:
-        ...
+    def __get__(self: _GFD, obj: None, cls: Any) -> _GFD: ...
 
     @overload
-    def __get__(self, obj: object, cls: Any) -> _T_co:
-        ...
+    def __get__(self, obj: object, cls: Any) -> _T_co: ...
 
     def __get__(self: _GFD, obj: Any, cls: Any) -> Union[_GFD, _T_co]:
         raise NotImplementedError()
 
     if TYPE_CHECKING:
 
-        def __set__(self, instance: Any, value: Any) -> None:
-            ...
+        def __set__(self, instance: Any, value: Any) -> None: ...
 
-        def __delete__(self, instance: Any) -> None:
-            ...
+        def __delete__(self, instance: Any) -> None: ...
 
     def _reset(self, obj: Any) -> None:
         raise NotImplementedError()
@@ -1237,18 +1237,15 @@ class HasMemoized:
         __name__: str
 
         def __init__(self, fget: Callable[..., _T], doc: Optional[str] = None):
-            # https://github.com/python/mypy/issues/708
-            self.fget = fget  # type: ignore
+            self.fget = fget
             self.__doc__ = doc or fget.__doc__
             self.__name__ = fget.__name__
 
-        @overload  # type: ignore[override]
-        def __get__(self: _MA, obj: None, cls: Any) -> _MA:
-            ...
+        @overload
+        def __get__(self: _MA, obj: None, cls: Any) -> _MA: ...
 
         @overload
-        def __get__(self, obj: Any, cls: Any) -> _T:
-            ...
+        def __get__(self, obj: Any, cls: Any) -> _T: ...
 
         def __get__(self, obj, cls):
             if obj is None:
@@ -1476,7 +1473,7 @@ def assert_arg_type(
         if isinstance(argtype, tuple):
             raise exc.ArgumentError(
                 "Argument '%s' is expected to be one of type %s, got '%s'"
-                % (name, " or ".join("'%s'" % a for a in argtype), type(arg))  # type: ignore  # noqa: E501
+                % (name, " or ".join("'%s'" % a for a in argtype), type(arg))
             )
         else:
             raise exc.ArgumentError(
@@ -1527,7 +1524,7 @@ class classproperty(property):
         self.__doc__ = fget.__doc__
 
     def __get__(self, obj: Any, cls: Optional[type] = None) -> Any:
-        return self.fget(cls)  # type: ignore
+        return self.fget(cls)
 
 
 class hybridproperty(Generic[_T]):
@@ -1955,7 +1952,7 @@ NoneType = type(None)
 
 
 def attrsetter(attrname):
-    code = "def set(obj, value):" "    obj.%s = value" % attrname
+    code = "def set(obj, value):    obj.%s = value" % attrname
     env = locals().copy()
     exec(code, env)
     return env["set"]

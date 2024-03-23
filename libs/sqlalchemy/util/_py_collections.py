@@ -1,5 +1,5 @@
 # util/_py_collections.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -59,11 +59,9 @@ class ReadOnlyContainer:
 class ImmutableDictBase(ReadOnlyContainer, Dict[_KT, _VT]):
     if TYPE_CHECKING:
 
-        def __new__(cls, *args: Any) -> Self:
-            ...
+        def __new__(cls, *args: Any) -> Self: ...
 
-        def __init__(cls, *args: Any):
-            ...
+        def __init__(cls, *args: Any): ...
 
     def _readonly(self, *arg: Any, **kw: Any) -> NoReturn:
         self._immutable()
@@ -148,12 +146,16 @@ class immutabledict(ImmutableDictBase[_KT, _VT]):
     def __or__(  # type: ignore[override]
         self, __value: Mapping[_KT, _VT]
     ) -> immutabledict[_KT, _VT]:
-        return immutabledict(super().__or__(__value))
+        return immutabledict(
+            super().__or__(__value),  # type: ignore[call-overload]
+        )
 
     def __ror__(  # type: ignore[override]
         self, __value: Mapping[_KT, _VT]
     ) -> immutabledict[_KT, _VT]:
-        return immutabledict(super().__ror__(__value))
+        return immutabledict(
+            super().__ror__(__value),  # type: ignore[call-overload]
+        )
 
 
 class OrderedSet(Set[_T]):
@@ -227,11 +229,11 @@ class OrderedSet(Set[_T]):
                     super().add(e)
 
     def __ior__(self, other: AbstractSet[_S]) -> OrderedSet[Union[_T, _S]]:
-        self.update(other)  # type: ignore
-        return self  # type: ignore
+        self.update(other)
+        return self
 
     def union(self, *other: Iterable[_S]) -> OrderedSet[Union[_T, _S]]:
-        result: OrderedSet[Union[_T, _S]] = self.copy()  # type: ignore
+        result: OrderedSet[Union[_T, _S]] = self.copy()
         result.update(*other)
         return result
 

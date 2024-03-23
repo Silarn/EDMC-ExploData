@@ -1,5 +1,5 @@
 # engine/cursor.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -120,7 +120,7 @@ _CursorKeyMapRecType = Tuple[
     List[Any],  # MD_OBJECTS
     str,  # MD_LOOKUP_KEY
     str,  # MD_RENDERED_NAME
-    Optional["_ResultProcessorType"],  # MD_PROCESSOR
+    Optional["_ResultProcessorType[Any]"],  # MD_PROCESSOR
     Optional[str],  # MD_UNTRANSLATED
 ]
 
@@ -134,7 +134,7 @@ _NonAmbigCursorKeyMapRecType = Tuple[
     List[Any],
     str,
     str,
-    Optional["_ResultProcessorType"],
+    Optional["_ResultProcessorType[Any]"],
     str,
 ]
 
@@ -151,7 +151,7 @@ class CursorResultMetaData(ResultMetaData):
         "_translated_indexes",
         "_safe_for_cache",
         "_unpickled",
-        "_key_to_index"
+        "_key_to_index",
         # don't need _unique_filters support here for now.  Can be added
         # if a need arises.
     )
@@ -225,9 +225,11 @@ class CursorResultMetaData(ResultMetaData):
             {
                 key: (
                     # int index should be None for ambiguous key
-                    value[0] + offset
-                    if value[0] is not None and key not in keymap
-                    else None,
+                    (
+                        value[0] + offset
+                        if value[0] is not None and key not in keymap
+                        else None
+                    ),
                     value[1] + offset,
                     *value[2:],
                 )
@@ -362,13 +364,11 @@ class CursorResultMetaData(ResultMetaData):
             ) = context.result_column_struct
             num_ctx_cols = len(result_columns)
         else:
-            result_columns = (  # type: ignore
-                cols_are_ordered
-            ) = (
+            result_columns = cols_are_ordered = (  # type: ignore
                 num_ctx_cols
-            ) = (
-                ad_hoc_textual
-            ) = loose_column_name_matching = textual_ordered = False
+            ) = ad_hoc_textual = loose_column_name_matching = (
+                textual_ordered
+            ) = False
 
         # merge cursor.description with the column info
         # present in the compiled structure, if any
@@ -1438,6 +1438,7 @@ class CursorResult(Result[_T]):
 
             metadata = self._init_metadata(context, cursor_description)
 
+            _make_row: Any
             _make_row = functools.partial(
                 Row,
                 metadata,
@@ -1610,11 +1611,11 @@ class CursorResult(Result[_T]):
         """
         if not self.context.compiled:
             raise exc.InvalidRequestError(
-                "Statement is not a compiled " "expression construct."
+                "Statement is not a compiled expression construct."
             )
         elif not self.context.isinsert:
             raise exc.InvalidRequestError(
-                "Statement is not an insert() " "expression construct."
+                "Statement is not an insert() expression construct."
             )
         elif self.context._is_explicit_returning:
             raise exc.InvalidRequestError(
@@ -1681,11 +1682,11 @@ class CursorResult(Result[_T]):
         """
         if not self.context.compiled:
             raise exc.InvalidRequestError(
-                "Statement is not a compiled " "expression construct."
+                "Statement is not a compiled expression construct."
             )
         elif not self.context.isupdate:
             raise exc.InvalidRequestError(
-                "Statement is not an update() " "expression construct."
+                "Statement is not an update() expression construct."
             )
         elif self.context.executemany:
             return self.context.compiled_parameters
@@ -1703,11 +1704,11 @@ class CursorResult(Result[_T]):
         """
         if not self.context.compiled:
             raise exc.InvalidRequestError(
-                "Statement is not a compiled " "expression construct."
+                "Statement is not a compiled expression construct."
             )
         elif not self.context.isinsert:
             raise exc.InvalidRequestError(
-                "Statement is not an insert() " "expression construct."
+                "Statement is not an insert() expression construct."
             )
         elif self.context.executemany:
             return self.context.compiled_parameters
@@ -1920,7 +1921,7 @@ class CursorResult(Result[_T]):
 
         if not self.context.compiled:
             raise exc.InvalidRequestError(
-                "Statement is not a compiled " "expression construct."
+                "Statement is not a compiled expression construct."
             )
         elif not self.context.isinsert and not self.context.isupdate:
             raise exc.InvalidRequestError(
@@ -1943,7 +1944,7 @@ class CursorResult(Result[_T]):
 
         if not self.context.compiled:
             raise exc.InvalidRequestError(
-                "Statement is not a compiled " "expression construct."
+                "Statement is not a compiled expression construct."
             )
         elif not self.context.isinsert and not self.context.isupdate:
             raise exc.InvalidRequestError(
@@ -1974,8 +1975,28 @@ class CursorResult(Result[_T]):
     def rowcount(self) -> int:
         """Return the 'rowcount' for this result.
 
-        The 'rowcount' reports the number of rows *matched*
-        by the WHERE criterion of an UPDATE or DELETE statement.
+        The primary purpose of 'rowcount' is to report the number of rows
+        matched by the WHERE criterion of an UPDATE or DELETE statement
+        executed once (i.e. for a single parameter set), which may then be
+        compared to the number of rows expected to be updated or deleted as a
+        means of asserting data integrity.
+
+        This attribute is transferred from the ``cursor.rowcount`` attribute
+        of the DBAPI before the cursor is closed, to support DBAPIs that
+        don't make this value available after cursor close.   Some DBAPIs may
+        offer meaningful values for other kinds of statements, such as INSERT
+        and SELECT statements as well.  In order to retrieve ``cursor.rowcount``
+        for these statements, set the
+        :paramref:`.Connection.execution_options.preserve_rowcount`
+        execution option to True, which will cause the ``cursor.rowcount``
+        value to be unconditionally memoized before any results are returned
+        or the cursor is closed, regardless of statement type.
+
+        For cases where the DBAPI does not support rowcount for a particular
+        kind of statement and/or execution, the returned value will be ``-1``,
+        which is delivered directly from the DBAPI and is part of :pep:`249`.
+        All DBAPIs should support rowcount for single-parameter-set
+        UPDATE and DELETE statements, however.
 
         .. note::
 
@@ -1984,37 +2005,46 @@ class CursorResult(Result[_T]):
 
            * This attribute returns the number of rows *matched*,
              which is not necessarily the same as the number of rows
-             that were actually *modified* - an UPDATE statement, for example,
+             that were actually *modified*. For example, an UPDATE statement
              may have no net change on a given row if the SET values
              given are the same as those present in the row already.
              Such a row would be matched but not modified.
              On backends that feature both styles, such as MySQL,
-             rowcount is configured by default to return the match
+             rowcount is configured to return the match
              count in all cases.
 
-           * :attr:`_engine.CursorResult.rowcount`
-             is *only* useful in conjunction
-             with an UPDATE or DELETE statement.  Contrary to what the Python
-             DBAPI says, it does *not* return the
-             number of rows available from the results of a SELECT statement
-             as DBAPIs cannot support this functionality when rows are
-             unbuffered.
+           * :attr:`_engine.CursorResult.rowcount` in the default case is
+             *only* useful in conjunction with an UPDATE or DELETE statement,
+             and only with a single set of parameters. For other kinds of
+             statements, SQLAlchemy will not attempt to pre-memoize the value
+             unless the
+             :paramref:`.Connection.execution_options.preserve_rowcount`
+             execution option is used.  Note that contrary to :pep:`249`, many
+             DBAPIs do not support rowcount values for statements that are not
+             UPDATE or DELETE, particularly when rows are being returned which
+             are not fully pre-buffered.   DBAPIs that dont support rowcount
+             for a particular kind of statement should return the value ``-1``
+             for such statements.
 
-           * :attr:`_engine.CursorResult.rowcount`
-             may not be fully implemented by
-             all dialects.  In particular, most DBAPIs do not support an
-             aggregate rowcount result from an executemany call.
-             The :meth:`_engine.CursorResult.supports_sane_rowcount` and
-             :meth:`_engine.CursorResult.supports_sane_multi_rowcount` methods
-             will report from the dialect if each usage is known to be
-             supported.
+           * :attr:`_engine.CursorResult.rowcount` may not be meaningful
+             when executing a single statement with multiple parameter sets
+             (i.e. an :term:`executemany`). Most DBAPIs do not sum "rowcount"
+             values across multiple parameter sets and will return ``-1``
+             when accessed.
 
-           * Statements that use RETURNING may not return a correct
-             rowcount.
+           * SQLAlchemy's :ref:`engine_insertmanyvalues` feature does support
+             a correct population of :attr:`_engine.CursorResult.rowcount`
+             when the :paramref:`.Connection.execution_options.preserve_rowcount`
+             execution option is set to True.
+
+           * Statements that use RETURNING may not support rowcount, returning
+             a ``-1`` value instead.
 
         .. seealso::
 
             :ref:`tutorial_update_delete_rowcount` - in the :ref:`unified_tutorial`
+
+            :paramref:`.Connection.execution_options.preserve_rowcount`
 
         """  # noqa: E501
         try:
@@ -2109,8 +2139,7 @@ class CursorResult(Result[_T]):
 
     def merge(self, *others: Result[Any]) -> MergedResult[Any]:
         merged_result = super().merge(*others)
-        setup_rowcounts = self.context._has_rowcount
-        if setup_rowcounts:
+        if self.context._has_rowcount:
             merged_result.rowcount = sum(
                 cast("CursorResult[Any]", result).rowcount
                 for result in (self,) + others

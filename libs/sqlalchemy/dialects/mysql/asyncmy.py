@@ -1,5 +1,5 @@
-# mysql/asyncmy.py
-# Copyright (C) 2005-2023 the SQLAlchemy authors and contributors <see AUTHORS
+# dialects/mysql/asyncmy.py
+# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors <see AUTHORS
 # file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -37,6 +37,8 @@ from ...util.concurrency import await_only
 
 
 class AsyncAdapt_asyncmy_cursor:
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     server_side = False
     __slots__ = (
         "_adapt_connection",
@@ -141,6 +143,8 @@ class AsyncAdapt_asyncmy_cursor:
 
 
 class AsyncAdapt_asyncmy_ss_cursor(AsyncAdapt_asyncmy_cursor):
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     __slots__ = ()
     server_side = True
 
@@ -171,6 +175,8 @@ class AsyncAdapt_asyncmy_ss_cursor(AsyncAdapt_asyncmy_cursor):
 
 
 class AsyncAdapt_asyncmy_connection(AdaptedConnection):
+    # TODO: base on connectors/asyncio.py
+    # see #10415
     await_ = staticmethod(await_only)
     __slots__ = ("dbapi", "_execute_mutex")
 
@@ -215,9 +221,12 @@ class AsyncAdapt_asyncmy_connection(AdaptedConnection):
     def commit(self):
         self.await_(self._connection.commit())
 
-    def close(self):
+    def terminate(self):
         # it's not awaitable.
         self._connection.close()
+
+    def close(self) -> None:
+        self.await_(self._connection.ensure_closed())
 
 
 class AsyncAdaptFallback_asyncmy_connection(AsyncAdapt_asyncmy_connection):
@@ -284,6 +293,7 @@ class MySQLDialect_asyncmy(MySQLDialect_pymysql):
     _sscursor = AsyncAdapt_asyncmy_ss_cursor
 
     is_async = True
+    has_terminate = True
 
     @classmethod
     def import_dbapi(cls):
@@ -297,6 +307,9 @@ class MySQLDialect_asyncmy(MySQLDialect_pymysql):
             return pool.FallbackAsyncAdaptedQueuePool
         else:
             return pool.AsyncAdaptedQueuePool
+
+    def do_terminate(self, dbapi_connection) -> None:
+        dbapi_connection.terminate()
 
     def create_connect_args(self, url):
         return super().create_connect_args(
