@@ -352,7 +352,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'molybdenum': 'Gold',
                         'niobium': 'Cobalt',
                         'tungsten': 'Yellow',
-                        'tin': 'Teal'
+                        'tin': 'Cyan'
                     }
                 },
                 '$Codex_Ent_Fumerolas_02_Name;': {
