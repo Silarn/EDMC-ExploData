@@ -530,9 +530,11 @@ data: Mapping[str, Mapping[str, any]] = {
                         'K': 'Red',
                         'M': 'Maroon',
                         'T': 'Teal',
+                        'Y': 'Lime',
                         'TTS': 'Sage',
                         'L': 'Ochre',
                         'AeBe': 'Grey',
+                        'D': 'Yellow',
                         'N': 'Emerald'
                     }
                 },
