@@ -327,7 +327,8 @@ class JournalParse:
             .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity']) \
             .set_rotation(entry['RotationPeriod']).set_orbital_period(entry.get('OrbitalPeriod', 0))
         if self._cmdr:
-            star_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id)
+            star_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
+                .set_scan_state(scan_type, self._cmdr.id)
 
         if 'Rings' in entry:
             for ring in entry['Rings']:
@@ -353,7 +354,7 @@ class JournalParse:
             .set_landable(entry.get('Landable', False)).set_terraform_state(entry.get('TerraformState', ''))
 
         if self._cmdr:
-            body_data.set_discovered(True, self._cmdr.id).set_was_discovered(was_discovered, self._cmdr.id) \
+            body_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
                 .set_was_mapped(entry['WasMapped'], self._cmdr.id).set_scan_state(scan_type, self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)

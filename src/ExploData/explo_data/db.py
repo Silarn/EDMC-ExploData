@@ -143,6 +143,7 @@ class StarStatus(Base):
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     discovered: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
     was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    scan_state: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('star_id', 'commander_id', name='_star_commander_constraint'),
                       )
 
@@ -511,8 +512,10 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'planets', Column('landable', Boolean(), nullable=False, server_default=text('FALSE')))
                 add_column(engine, 'planet_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
             if int(version['value']) < 6:
-                run_query(engine, 'DELETE FROM journal_log')
                 add_column(engine, 'planets', Column('geo_signals', Integer(), nullable=False, server_default=text('0')))
+            if int(version['value']) < 7:
+                run_query(engine, 'DELETE FROM journal_log')
+                add_column(engine, 'star_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)

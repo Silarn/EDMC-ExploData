@@ -639,6 +639,17 @@ class StarData:
         self.commit()
         return self
 
+    def get_scan_state(self, commander_id: int) -> int:
+        status = self.get_status(commander_id)
+        return status.scan_state
+
+    def set_scan_state(self, value: int, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        if value > status.scan_state:
+            status.scan_state = value
+        self.commit()
+        return self
+
     def refresh(self) -> None:
         self._session.refresh(self._system)
         self._session.refresh(self._data)
