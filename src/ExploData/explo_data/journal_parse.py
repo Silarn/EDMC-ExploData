@@ -319,7 +319,7 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with star data)
         """
 
-        was_discovered = entry['ScanType'] == 'NavBeaconDetail' or entry['WasDiscovered']
+        scan_type = get_scan_type(entry['ScanType'])
         body_short_name = self.get_body_name(entry['BodyName'])
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
@@ -342,7 +342,6 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with planet data)
         """
 
-        was_discovered = entry['ScanType'] == 'NavBeaconDetail' or entry['WasDiscovered']
         scan_type = get_scan_type(entry['ScanType'])
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
