@@ -440,14 +440,14 @@ class JournalParse:
 
 def get_scan_type(scan: str) -> int:
     match scan:
-        case 'AutoScan':
+        case 'NavBeaconDetail':
             return 1
+        case 'AutoScan':
+            return 2
+        case 'Basic':
+            return 3
         case 'Detailed':
             return 4
-        case 'NavBeaconDetail':
-            return 3
-        case 'Basic':
-            return 2
         case _:
             return 0
 
