@@ -141,7 +141,7 @@ class StarStatus(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     star_id: Mapped[int] = mapped_column(ForeignKey('stars.id', ondelete="CASCADE"))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    discovered: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
+    discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     scan_state: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('star_id', 'commander_id', name='_star_commander_constraint'),
@@ -190,7 +190,7 @@ class PlanetStatus(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    discovered: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
+    discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
