@@ -514,9 +514,11 @@ DELETE FROM planets WHERE ROWID IN (
             if int(version['value']) < 6:
                 add_column(engine, 'planets', Column('geo_signals', Integer(), nullable=False, server_default=text('0')))
             if int(version['value']) < 7:
+                add_column(engine, 'star_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
+            if int(version['value']) < 8:
                 run_query(engine, 'DELETE FROM journal_log')
                 run_query(engine, 'UPDATE planet_status SET scan_state=0 WHERE scan_state<4')
-                add_column(engine, 'star_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
+                run_query(engine, 'UPDATE star_status SET scan_state=0 WHERE scan_state<4')
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
