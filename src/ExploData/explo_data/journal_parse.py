@@ -87,11 +87,16 @@ class JournalParse:
                 retry = 2
                 while True:
                     result = self.parse_entry(line)
-                    if not result:
+                    if result == 1:
                         failures += 1
                     if (failures >= 3 and retry == 0) or event.is_set():
                         return 1
-                    elif result:
+                    elif result == 2:
+                        failures += 1
+                        if failures >= 3:
+                            return 1
+                        break
+                    elif result == 0:
                         break
                     retry -= 1
                     sleep(.1)
@@ -107,7 +112,7 @@ class JournalParse:
             self._session.expunge(journal)
         return 0
 
-    def parse_entry(self, line: bytes) -> bool:
+    def parse_entry(self, line: bytes) -> int:
         """
         Parse a single line of a journal file. Load as JSON and pass to the processor.
 
@@ -120,10 +125,13 @@ class JournalParse:
         try:
             entry: Mapping[str, Any] = json.loads(line)
             self.process_entry(entry)
+        except json.JSONDecodeError as ex:
+            logger.error(f'Journal JSON decode issue:\n{line!r}\n', exc_info=ex)
+            return 2
         except Exception as ex:
-            logger.error(f'Invalid journal entry:\n{line!r}\n', exc_info=ex)
-            return False
-        return True
+            logger.error(f'Journal parse error:\n{line!r}\n', exc_info=ex)
+            return 1
+        return 0
 
     def process_entry(self, entry: Mapping[str, Any]) -> None:
         """
