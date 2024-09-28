@@ -9,6 +9,7 @@ from typing import Optional, Mapping, MutableMapping
 from EDMCLogging import get_plugin_logger
 
 import ExploData.explo_data.journal_parse
+import ExploData.explo_data.edsm_parse
 import explo_data.const
 from explo_data import db
 from explo_data.journal_parse import JournalParse
@@ -59,6 +60,7 @@ def plugin_stop():
     """
 
     ExploData.explo_data.journal_parse.shutdown()
+    ExploData.explo_data.edsm_parse.shutdown()
     db.shutdown()
 
 

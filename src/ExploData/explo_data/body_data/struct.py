@@ -84,7 +84,7 @@ class PlanetData:
         return 0.0
 
     def get_volcanism(self) -> str:
-        return self._data.volcanism
+        return self._data.volcanism or ''
 
     def set_volcanism(self, value: Optional[int]) -> Self:
         self._data.volcanism = value
