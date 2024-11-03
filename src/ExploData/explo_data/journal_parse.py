@@ -87,16 +87,11 @@ class JournalParse:
                 retry = 2
                 while True:
                     result = self.parse_entry(line)
-                    if result == 1:
-                        failures += 1
-                    if (failures >= 3 and retry == 0) or event.is_set():
+                    if result != 0:
+                        failures +=1
+                    if (failures >= 6 and retry == 0) or event.is_set():
                         return 1
-                    elif result == 2:
-                        failures += 1
-                        if failures >= 3:
-                            return 1
-                        break
-                    elif result == 0:
+                    if result == 0 or result == 2:
                         break
                     retry -= 1
                     sleep(.1)
