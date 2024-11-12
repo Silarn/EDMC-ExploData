@@ -137,3 +137,15 @@ def map_edsm_atmosphere(atmosphere: str) -> str:
     if atmosphere == 'No atmosphere':
         return 'None'
     return atmosphere
+
+def parse_edsm_ring_class(type: str) -> str:
+    match type:
+        case 'Icy':
+            return 'eRingClass_Icy'
+        case 'Metallic':
+            return 'eRingClass_Metalic'
+        case 'Metal Rich':
+            return 'eRingClass_MetalRich'
+        case 'Rocky':
+            return 'eRingClass_Rocky'
+    return ''

@@ -18,7 +18,7 @@ from EDMCLogging import get_plugin_logger
 from ExploData.explo_data import const
 from .db import System, get_session, Star
 from .body_data.struct import PlanetData, StarData
-from .body_data.edsm import parse_edsm_star_class, map_edsm_type, map_edsm_atmosphere
+from .body_data.edsm import parse_edsm_star_class, parse_edsm_ring_class, map_edsm_type, map_edsm_atmosphere
 
 
 class This:
@@ -141,6 +141,11 @@ class EDSMFetch:
                     if atmosphere_composition:
                         for gas, percent in atmosphere_composition.items():
                             planet_data.add_gas(map_edsm_atmosphere(gas), percent)
+
+                    if 'rings' in body:
+                        for ring in body['rings']:
+                            ring_name = ring['name'][len(body['name'])+1:]
+                            planet_data.add_ring(ring_name, parse_edsm_ring_class(ring['type']))
     
                 except Exception as e:
                     logger.error('Error while parsing EDSM', exc_info=e)
@@ -169,6 +174,11 @@ class EDSMFetch:
             star_data.set_mass(body['solarMasses'])
             star_data.set_orbital_period(body['orbitalPeriod'] * 86400 if body['orbitalPeriod'] else 0)
             star_data.set_rotation(body['rotationalPeriod'] * 86400)
+            for ring_type in ['belts', 'rings']:
+                if ring_type in body:
+                    for belt in body[ring_type]:
+                        ring_name = belt['name'][len(body['name'])+1:]
+                        star_data.add_ring(ring_name, parse_edsm_ring_class(belt['type']))
         except Exception as e:
             logger.error('Error while parsing EDSM', exc_info=e)
 
