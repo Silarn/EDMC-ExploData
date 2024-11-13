@@ -16,7 +16,8 @@ The data currently being collected by this plugin includes:
 - Systems (name, location, body count and scan status)
 - Stars (name, location, and various properties, discovery status)
 - Planets (name, location, attributes, local biological signals, discovery and mapped status)
-- Non-body Objects (rings, asteroid clusters)
+- Asteroid belts and rings (stellar and planetary)
+- Non-body Objects (asteroid clusters)
 - Flora (type, location, scan status)
 - Codex Entries (for biological signals)
 
@@ -35,7 +36,13 @@ Plugins should check for compatible database versions.
 ## Journal Importing
 
 The plugin contains a threaded journal importing process, though this must be initiated by another plugin. It will
-track completed journal files and can be started and stopped on demand.
+track completed journal files and can be started and stopped on demand. Hook functions are used to initialize the
+parse, track progress, and notify (and trigger data / display updates) once complete.
+
+## EDSM Parsing
+
+ExploData supports parsing data from EDSM. Hook functions must be set up to trigger the parse and notify plugins
+which make use of the data.
 
 ## Installation
 
