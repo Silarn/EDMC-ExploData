@@ -345,7 +345,7 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with planet data)
         """
 
-        scan_type = get_scan_type(entry['ScanType'])
+        scan_type = get_scan_type(entry.get('ScanType', parse_old_scan_type(entry)))
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
         body_data.set_distance(float(entry['DistanceFromArrivalLS'])).set_type(entry['PlanetClass']) \
@@ -453,6 +453,13 @@ def get_scan_type(scan: str) -> int:
             return 4
         case _:
             return 0
+
+
+def parse_old_scan_type(entry: Mapping[str, any]) -> str:
+    if 'SurfaceTemperature' in entry:
+        return 'Detailed'
+    else:
+        return 'Basic'
 
 
 def parse_journal(journal: Path, event: Event) -> int:
