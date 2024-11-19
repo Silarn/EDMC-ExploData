@@ -448,11 +448,9 @@ def get_scan_type(scan: str) -> int:
     match scan:
         case 'NavBeacon' | 'NavBeaconDetail':
             return 1
-        case 'AutoScan':
-            return 2
         case 'Basic':
             return 3
-        case 'Detailed':
+        case 'AutoScan' | 'Detailed':
             return 4
         case _:
             return 0
