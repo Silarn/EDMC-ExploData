@@ -13,7 +13,6 @@ from datetime import datetime
 from os import listdir, cpu_count
 from os.path import expanduser
 from pathlib import Path
-from semantic_version import Version
 from time import sleep
 from threading import Event
 from typing import Any, BinaryIO, Callable, Mapping, Optional
@@ -66,7 +65,6 @@ class JournalParse:
     EDMC journal parser hook and by the threaded journal import function, generally called by other plugins.
     """
     def __init__(self, session: Session):
-        self._game_version: Optional[Version] = None
         self._session: Session = session
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
@@ -138,13 +136,6 @@ class JournalParse:
         """
         event_type = entry['event'].lower()
         match event_type:
-            case 'fileheader':
-                try:
-                    self._game_version = Version.coerce(entry['gameversion'].split(' ')[0])
-
-                except ValueError:
-                    self._game_version = None
-                    pass
             case 'loadgame':
                 self._session.close()
                 self.set_cmdr(entry['Commander'])
@@ -364,11 +355,6 @@ class JournalParse:
             .set_radius(entry['Radius']).set_volcanism(entry.get('Volcanism', None)) \
             .set_rotation(entry['RotationPeriod']).set_orbital_period(entry.get('OrbitalPeriod', 0)) \
             .set_landable(entry.get('Landable', False)).set_terraform_state(entry.get('TerraformState', ''))
-
-        if self._game_version and self._game_version < Version('3.3.0'):
-            if scan_type == 4:
-                body_data.set_mapped(True, self._cmdr.id) \
-                    .set_efficient(False, self._cmdr.id)
 
         if self._cmdr:
             body_data.set_discovered(True, self._cmdr.id) \
