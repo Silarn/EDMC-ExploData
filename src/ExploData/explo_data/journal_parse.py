@@ -13,6 +13,7 @@ from datetime import datetime
 from os import listdir, cpu_count
 from os.path import expanduser
 from pathlib import Path
+from semantic_version import Version
 from time import sleep
 from threading import Event
 from typing import Any, BinaryIO, Callable, Mapping, Optional
@@ -65,6 +66,7 @@ class JournalParse:
     EDMC journal parser hook and by the threaded journal import function, generally called by other plugins.
     """
     def __init__(self, session: Session):
+        self._game_version: Optional[Version] = None
         self._session: Session = session
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
@@ -136,6 +138,13 @@ class JournalParse:
         """
         event_type = entry['event'].lower()
         match event_type:
+            case 'fileheader':
+                try:
+                    self._game_version = Version.coerce(entry['gameversion'].split(' ')[0])
+
+                except ValueError:
+                    self._game_version = None
+                    pass
             case 'loadgame':
                 self._session.close()
                 self.set_cmdr(entry['Commander'])
@@ -322,7 +331,7 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with star data)
         """
 
-        scan_type = get_scan_type(entry['ScanType'])
+        scan_type = get_scan_type(entry.get('ScanType', parse_old_scan_type(entry)))
         body_short_name = self.get_body_name(entry['BodyName'])
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
 
@@ -330,7 +339,8 @@ class JournalParse:
             .set_mass(entry['StellarMass']).set_subclass(entry['Subclass']).set_luminosity(entry['Luminosity']) \
             .set_rotation(entry['RotationPeriod']).set_orbital_period(entry.get('OrbitalPeriod', 0))
         if self._cmdr:
-            star_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
+            star_data.set_discovered(True, self._cmdr.id) \
+                .set_was_discovered(entry.get('WasDiscovered', False), self._cmdr.id) \
                 .set_scan_state(scan_type, self._cmdr.id)
 
         if 'Rings' in entry:
@@ -355,9 +365,16 @@ class JournalParse:
             .set_rotation(entry['RotationPeriod']).set_orbital_period(entry.get('OrbitalPeriod', 0)) \
             .set_landable(entry.get('Landable', False)).set_terraform_state(entry.get('TerraformState', ''))
 
+        if self._game_version and self._game_version < Version('3.3.0'):
+            if scan_type == 4:
+                body_data.set_mapped(True, self._cmdr.id) \
+                    .set_efficient(False, self._cmdr.id)
+
         if self._cmdr:
-            body_data.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
-                .set_was_mapped(entry['WasMapped'], self._cmdr.id).set_scan_state(scan_type, self._cmdr.id)
+            body_data.set_discovered(True, self._cmdr.id) \
+                .set_was_discovered(entry.get('WasDiscovered', False), self._cmdr.id) \
+                .set_was_mapped(entry.get('WasMapped', False), self._cmdr.id) \
+                .set_scan_state(scan_type, self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
         if star_search:
@@ -443,7 +460,7 @@ class JournalParse:
 
 def get_scan_type(scan: str) -> int:
     match scan:
-        case 'NavBeaconDetail':
+        case 'NavBeacon' | 'NavBeaconDetail':
             return 1
         case 'AutoScan':
             return 2
@@ -456,7 +473,7 @@ def get_scan_type(scan: str) -> int:
 
 
 def parse_old_scan_type(entry: Mapping[str, any]) -> str:
-    if 'SurfaceTemperature' in entry:
+    if 'SurfaceTemperature' in entry and 'PlanetClass' in entry:
         return 'Detailed'
     else:
         return 'Basic'
