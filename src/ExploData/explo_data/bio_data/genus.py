@@ -196,15 +196,15 @@ data: Mapping[str, Mapping[str, any]] = {
             'star': {
                 'O': 'Grey',
                 'A': 'Green',
-                'F': 'Yellow',
                 'G': 'Teal',
+                'F': 'Yellow',
                 'M': 'Amethyst',
                 'L': 'Mauve',
                 'T': 'Orange',
                 'Y': 'Ocher',
                 'TTS': 'Red',
-                'D': 'Turquoise',
                 'W': 'Indigo',
+                'D': 'Turquoise',
                 'N': 'Sage',
             }
         }
@@ -217,13 +217,13 @@ data: Mapping[str, Mapping[str, any]] = {
             'star': {
                 'B': 'Maroon',
                 'A': 'Orange',
-                'F': 'Mauve',
                 'G': 'Amethyst',
+                'F': 'Mauve',
                 'K': 'Grey',
                 'M': 'Turquoise',
-                'Y': 'Green',
                 'L': 'Teal',
-                'W': 'Lime',
+                'Y': 'Green',
+                'D': 'Lime',
                 'N': 'Yellow',
             }
         }
