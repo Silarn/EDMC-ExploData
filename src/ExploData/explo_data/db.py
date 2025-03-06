@@ -2,14 +2,15 @@
 # ExploData module plugin for EDMC
 # Source: https://github.com/Silarn/EDMC-ExploData
 # Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
-import os
+
 import threading
+from datetime import datetime
 from sqlite3 import OperationalError
 from typing import Optional
 
 import sqlalchemy.exc
 from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Boolean, \
-    MetaData, Executable, Result, create_engine, event, DefaultClause
+    MetaData, Executable, Result, create_engine, event, DefaultClause, DateTime, func
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql import sqltypes
@@ -112,6 +113,7 @@ class Star(Base):
     body_id: Mapped[int]
     statuses: Mapped[list['StarStatus']] = relationship(backref='status', passive_deletes=True)
     rings: Mapped[list['StarRing']] = relationship(backref='ring', passive_deletes=True)
+    scans: Mapped[list['StarScans']] = relationship(backref='scan', passive_deletes=True)
     distance: Mapped[Optional[float]]
     mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     rotation: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
@@ -179,6 +181,7 @@ class Planet(Base):
     floras: Mapped[list['PlanetFlora']] = relationship(backref='flora', passive_deletes=True)
     geos: Mapped[list['PlanetGeo']] = relationship(backref='geo', passive_deletes=True)
     rings: Mapped[list['PlanetRing']] = relationship(backref='ring', passive_deletes=True)
+    scans: Mapped[list['PlanetScans']] = relationship(backref='scan', passive_deletes=True)
 
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
                       )
@@ -252,13 +255,33 @@ class PlanetRing(Base):
                       )
 
 
+class StarScans(Base):
+    __tablename__ = 'star_scans'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    star_id: Mapped[int] = mapped_column(ForeignKey('stars.id', ondelete="CASCADE"))
+    time: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class PlanetScans(Base):
+    __tablename__ = 'planet_scans'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
+    scan_level: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    time: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class FloraScans(Base):
     __tablename__ = 'flora_scans'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
-    count: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    type: Mapped[str] = mapped_column(String(12), default='Logged', server_default=text('Logged'))
+    time: Mapped[datetime] = mapped_column(server_default=func.now())
     __table_args__ = (UniqueConstraint('commander_id', 'flora_id', name='_cmdr_flora_constraint'),
                       )
 
