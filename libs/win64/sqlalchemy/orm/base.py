@@ -1,5 +1,5 @@
 # orm/base.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -145,7 +145,7 @@ class PassiveFlag(FastIntFlag):
     """
 
     NO_AUTOFLUSH = 64
-    """Loader callables should disable autoflush.""",
+    """Loader callables should disable autoflush."""
 
     NO_RAISE = 128
     """Loader callables should not raise any assertions"""

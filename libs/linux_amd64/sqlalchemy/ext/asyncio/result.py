@@ -1,5 +1,5 @@
 # ext/asyncio/result.py
-# Copyright (C) 2020-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2020-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -93,6 +93,7 @@ class AsyncResult(_WithKeys, AsyncCommon[Row[_TP]]):
 
         self._metadata = real_result._metadata
         self._unique_filter_state = real_result._unique_filter_state
+        self._source_supports_scalars = real_result._source_supports_scalars
         self._post_creational_filter = None
 
         # BaseCursorResult pre-generates the "_row_getter".  Use that

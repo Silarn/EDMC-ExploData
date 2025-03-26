@@ -1,5 +1,5 @@
 # sql/_typing.py
-# Copyright (C) 2022-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2022-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from .roles import FromClauseRole
     from .schema import Column
     from .selectable import Alias
+    from .selectable import CompoundSelect
     from .selectable import CTE
     from .selectable import FromClause
     from .selectable import Join
@@ -247,7 +248,9 @@ come from the ORM.
 """
 
 _SelectStatementForCompoundArgument = Union[
-    "SelectBase", roles.CompoundElementRole
+    "Select[_TP]",
+    "CompoundSelect[_TP]",
+    roles.CompoundElementRole,
 ]
 """SELECT statement acceptable by ``union()`` and other SQL set operations"""
 

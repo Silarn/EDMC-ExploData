@@ -1,5 +1,5 @@
 # engine/result.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -52,11 +52,11 @@ else:
     from sqlalchemy.cyextension.resultproxy import tuplegetter as tuplegetter
 
 if typing.TYPE_CHECKING:
-    from ..sql.schema import Column
+    from ..sql.elements import SQLCoreOperations
     from ..sql.type_api import _ResultProcessorType
 
-_KeyType = Union[str, "Column[Any]"]
-_KeyIndexType = Union[str, "Column[Any]", int]
+_KeyType = Union[str, "SQLCoreOperations[Any]"]
+_KeyIndexType = Union[_KeyType, int]
 
 # is overridden in cursor using _CursorKeyMapRecType
 _KeyMapRecType = Any
@@ -1099,17 +1099,15 @@ class Result(_WithKeys, ResultInternal[Row[_TP]]):
             statement = select(table.c.x, table.c.y, table.c.z)
             result = connection.execute(statement)
 
-            for z, y in result.columns('z', 'y'):
-                # ...
-
+            for z, y in result.columns("z", "y"):
+                ...
 
         Example of using the column objects from the statement itself::
 
             for z, y in result.columns(
-                    statement.selected_columns.c.z,
-                    statement.selected_columns.c.y
+                statement.selected_columns.c.z, statement.selected_columns.c.y
             ):
-                # ...
+                ...
 
         .. versionadded:: 1.4
 

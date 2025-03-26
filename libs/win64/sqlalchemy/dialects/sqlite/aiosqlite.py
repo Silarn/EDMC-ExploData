@@ -1,5 +1,5 @@
 # dialects/sqlite/aiosqlite.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -31,6 +31,7 @@ This dialect should normally be used only with the
 :func:`_asyncio.create_async_engine` engine creation function::
 
     from sqlalchemy.ext.asyncio import create_async_engine
+
     engine = create_async_engine("sqlite+aiosqlite:///filename")
 
 The URL passes through all arguments to the ``pysqlite`` driver, so all
@@ -58,11 +59,13 @@ The solution is similar to :ref:`pysqlite_serializable`. This is achieved by the
 
     engine = create_async_engine("sqlite+aiosqlite:///myfile.db")
 
+
     @event.listens_for(engine.sync_engine, "connect")
     def do_connect(dbapi_connection, connection_record):
         # disable aiosqlite's emitting of the BEGIN statement entirely.
         # also stops it from emitting COMMIT before any DDL.
         dbapi_connection.isolation_level = None
+
 
     @event.listens_for(engine.sync_engine, "begin")
     def do_begin(conn):
@@ -74,6 +77,28 @@ The solution is similar to :ref:`pysqlite_serializable`. This is achieved by the
    :class:`_engine.Connection` and :func:`_sa.create_engine`
    with the SQLite driver,
    as this function necessarily will also alter the ".isolation_level" setting.
+
+.. _aiosqlite_pooling:
+
+Pooling Behavior
+----------------
+
+The SQLAlchemy ``aiosqlite`` DBAPI establishes the connection pool differently
+based on the kind of SQLite database that's requested:
+
+* When a ``:memory:`` SQLite database is specified, the dialect by default
+  will use :class:`.StaticPool`. This pool maintains a single
+  connection, so that all access to the engine
+  use the same ``:memory:`` database.
+* When a file-based database is specified, the dialect will use
+  :class:`.AsyncAdaptedQueuePool` as the source of connections.
+
+  .. versionchanged:: 2.0.38
+
+    SQLite file database engines now use :class:`.AsyncAdaptedQueuePool` by default.
+    Previously, :class:`.NullPool` were used.  The :class:`.NullPool` class
+    may be used by specifying it via the
+    :paramref:`_sa.create_engine.poolclass` parameter.
 
 """  # noqa
 
@@ -377,7 +402,7 @@ class SQLiteDialect_aiosqlite(SQLiteDialect_pysqlite):
     @classmethod
     def get_pool_class(cls, url):
         if cls._is_url_file_db(url):
-            return pool.NullPool
+            return pool.AsyncAdaptedQueuePool
         else:
             return pool.StaticPool
 

@@ -1,5 +1,5 @@
 # sql/compiler.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -2346,7 +2346,8 @@ class SQLCompiler(Compiled):
         """Called when a SELECT statement has no froms, and no FROM clause is
         to be appended.
 
-        Gives Oracle a chance to tack on a ``FROM DUAL`` to the string output.
+        Gives Oracle Database a chance to tack on a ``FROM DUAL`` to the string
+        output.
 
         """
         return ""
@@ -4073,15 +4074,28 @@ class SQLCompiler(Compiled):
 
                 del self.level_name_by_cte[existing_cte_reference_cte]
             else:
-                # if the two CTEs are deep-copy identical, consider them
-                # the same, **if** they are clones, that is, they came from
-                # the ORM or other visit method
                 if (
-                    cte._is_clone_of is not None
-                    or existing_cte._is_clone_of is not None
-                ) and cte.compare(existing_cte):
+                    # if the two CTEs have the same hash, which we expect
+                    # here means that one/both is an annotated of the other
+                    (hash(cte) == hash(existing_cte))
+                    # or...
+                    or (
+                        (
+                            # if they are clones, i.e. they came from the ORM
+                            # or some other visit method
+                            cte._is_clone_of is not None
+                            or existing_cte._is_clone_of is not None
+                        )
+                        # and are deep-copy identical
+                        and cte.compare(existing_cte)
+                    )
+                ):
+                    # then consider these two CTEs the same
                     is_new_cte = False
                 else:
+                    # otherwise these are two CTEs that either will render
+                    # differently, or were indicated separately by the user,
+                    # with the same name
                     raise exc.CompileError(
                         "Multiple, unrelated CTEs found with "
                         "the same name: %r" % cte_name
@@ -6113,6 +6127,10 @@ class SQLCompiler(Compiled):
         """Provide a hook for MySQL to add LIMIT to the UPDATE"""
         return None
 
+    def delete_limit_clause(self, delete_stmt):
+        """Provide a hook for MySQL to add LIMIT to the DELETE"""
+        return None
+
     def update_tables_clause(self, update_stmt, from_table, extra_froms, **kw):
         """Provide a hook to override the initial table clause
         in an UPDATE statement.
@@ -6404,6 +6422,10 @@ class SQLCompiler(Compiled):
             )
             if t:
                 text += " WHERE " + t
+
+        limit_clause = self.delete_limit_clause(delete_stmt)
+        if limit_clause:
+            text += " " + limit_clause
 
         if (
             self.implicit_returning or delete_stmt._returning

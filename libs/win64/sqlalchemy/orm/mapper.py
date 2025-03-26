@@ -1,5 +1,5 @@
 # orm/mapper.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -329,7 +329,7 @@ class Mapper(
 
                 class User(Base):
                     __table__ = user_table
-                    __mapper_args__ = {'column_prefix':'_'}
+                    __mapper_args__ = {"column_prefix": "_"}
 
            The above mapping will assign the ``user_id``, ``user_name``, and
            ``password`` columns to attributes named ``_user_id``,
@@ -545,14 +545,14 @@ class Mapper(
           base-most mapped :class:`.Table`::
 
             class Employee(Base):
-                __tablename__ = 'employee'
+                __tablename__ = "employee"
 
                 id: Mapped[int] = mapped_column(primary_key=True)
                 discriminator: Mapped[str] = mapped_column(String(50))
 
                 __mapper_args__ = {
-                    "polymorphic_on":discriminator,
-                    "polymorphic_identity":"employee"
+                    "polymorphic_on": discriminator,
+                    "polymorphic_identity": "employee",
                 }
 
           It may also be specified
@@ -561,17 +561,18 @@ class Mapper(
           approach::
 
             class Employee(Base):
-                __tablename__ = 'employee'
+                __tablename__ = "employee"
 
                 id: Mapped[int] = mapped_column(primary_key=True)
                 discriminator: Mapped[str] = mapped_column(String(50))
 
                 __mapper_args__ = {
-                    "polymorphic_on":case(
+                    "polymorphic_on": case(
                         (discriminator == "EN", "engineer"),
                         (discriminator == "MA", "manager"),
-                        else_="employee"),
-                    "polymorphic_identity":"employee"
+                        else_="employee",
+                    ),
+                    "polymorphic_identity": "employee",
                 }
 
           It may also refer to any attribute using its string name,
@@ -579,14 +580,14 @@ class Mapper(
           configurations::
 
                 class Employee(Base):
-                    __tablename__ = 'employee'
+                    __tablename__ = "employee"
 
                     id: Mapped[int] = mapped_column(primary_key=True)
                     discriminator: Mapped[str]
 
                     __mapper_args__ = {
                         "polymorphic_on": "discriminator",
-                        "polymorphic_identity": "employee"
+                        "polymorphic_identity": "employee",
                     }
 
           When setting ``polymorphic_on`` to reference an
@@ -602,6 +603,7 @@ class Mapper(
 
                 from sqlalchemy import event
                 from sqlalchemy.orm import object_mapper
+
 
                 @event.listens_for(Employee, "init", propagate=True)
                 def set_identity(instance, *arg, **kw):
@@ -3259,14 +3261,9 @@ class Mapper(
         The resulting structure is a dictionary of columns mapped
         to lists of equivalent columns, e.g.::
 
-            {
-                tablea.col1:
-                    {tableb.col1, tablec.col1},
-                tablea.col2:
-                    {tabled.col2}
-            }
+            {tablea.col1: {tableb.col1, tablec.col1}, tablea.col2: {tabled.col2}}
 
-        """
+        """  # noqa: E501
         result: _EquivalentColumnMap = {}
 
         def visit_binary(binary):
@@ -3443,7 +3440,7 @@ class Mapper(
 
     def identity_key_from_row(
         self,
-        row: Optional[Union[Row[Any], RowMapping]],
+        row: Union[Row[Any], RowMapping],
         identity_token: Optional[Any] = None,
         adapter: Optional[ORMAdapter] = None,
     ) -> _IdentityKeyType[_O]:
@@ -3462,14 +3459,15 @@ class Mapper(
         if adapter:
             pk_cols = [adapter.columns[c] for c in pk_cols]
 
+        mapping: RowMapping
         if hasattr(row, "_mapping"):
-            mapping = row._mapping  # type: ignore
+            mapping = row._mapping
         else:
-            mapping = cast("Mapping[Any, Any]", row)
+            mapping = row  # type: ignore[assignment]
 
         return (
             self._identity_class,
-            tuple(mapping[column] for column in pk_cols),  # type: ignore
+            tuple(mapping[column] for column in pk_cols),
             identity_token,
         )
 
@@ -3739,14 +3737,15 @@ class Mapper(
 
         given::
 
-            class A:
-                ...
+            class A: ...
+
 
             class B(A):
                 __mapper_args__ = {"polymorphic_load": "selectin"}
 
-            class C(B):
-                ...
+
+            class C(B): ...
+
 
             class D(B):
                 __mapper_args__ = {"polymorphic_load": "selectin"}
