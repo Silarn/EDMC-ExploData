@@ -634,8 +634,7 @@ data: Mapping[str, Mapping[str, any]] = {
                     'star': {
                         'B': 'Emerald',
                         'A': 'Emerald',
-                        'N': 'Emerald',
-                        'T': 'Emerald'
+                        'N': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Stratum_05_Name;': {
