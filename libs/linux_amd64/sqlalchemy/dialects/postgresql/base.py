@@ -266,7 +266,7 @@ will remain consistent with the state of the transaction::
     from sqlalchemy import event
 
     postgresql_engine = create_engine(
-        "postgresql+pyscopg2://scott:tiger@hostname/dbname",
+        "postgresql+psycopg2://scott:tiger@hostname/dbname",
         # disable default reset-on-return scheme
         pool_reset_on_return=None,
     )
@@ -978,6 +978,8 @@ PostgreSQL-Specific Index Options
 Several extensions to the :class:`.Index` construct are available, specific
 to the PostgreSQL dialect.
 
+.. _postgresql_covering_indexes:
+
 Covering Indexes
 ^^^^^^^^^^^^^^^^
 
@@ -989,6 +991,10 @@ string names::
 would render the index as ``CREATE INDEX my_index ON table (x) INCLUDE (y)``
 
 Note that this feature requires PostgreSQL 11 or later.
+
+.. seealso::
+
+  :ref:`postgresql_constraint_options`
 
 .. versionadded:: 1.4
 
@@ -1264,6 +1270,65 @@ with selected constraint constructs:
       <https://www.postgresql.org/docs/current/static/sql-altertable.html>`_ -
       in the PostgreSQL documentation.
 
+* ``INCLUDE``:  This option adds one or more columns as a "payload" to the
+  unique index created automatically by PostgreSQL for the constraint.
+  For example, the following table definition::
+
+      Table(
+          "mytable",
+          metadata,
+          Column("id", Integer, nullable=False),
+          Column("value", Integer, nullable=False),
+          UniqueConstraint("id", postgresql_include=["value"]),
+      )
+
+  would produce the DDL statement
+
+  .. sourcecode:: sql
+
+       CREATE TABLE mytable (
+           id INTEGER NOT NULL,
+           value INTEGER NOT NULL,
+           UNIQUE (id) INCLUDE (value)
+        )
+
+  Note that this feature requires PostgreSQL 11 or later.
+
+  .. versionadded:: 2.0.41
+
+  .. seealso::
+
+      :ref:`postgresql_covering_indexes`
+
+  .. seealso::
+
+      `PostgreSQL CREATE TABLE options
+      <https://www.postgresql.org/docs/current/static/sql-createtable.html>`_ -
+      in the PostgreSQL documentation.
+
+* Column list with foreign key ``ON DELETE SET`` actions:  This applies to
+  :class:`.ForeignKey` and :class:`.ForeignKeyConstraint`, the :paramref:`.ForeignKey.ondelete`
+  parameter will accept on the PostgreSQL backend only a string list of column
+  names inside parenthesis, following the ``SET NULL`` or ``SET DEFAULT``
+  phrases, which will limit the set of columns that are subject to the
+  action::
+
+        fktable = Table(
+            "fktable",
+            metadata,
+            Column("tid", Integer),
+            Column("id", Integer),
+            Column("fk_id_del_set_null", Integer),
+            ForeignKeyConstraint(
+                columns=["tid", "fk_id_del_set_null"],
+                refcolumns=[pktable.c.tid, pktable.c.id],
+                ondelete="SET NULL (fk_id_del_set_null)",
+            ),
+        )
+
+  .. versionadded:: 2.0.40
+
+
 .. _postgresql_table_valued_overview:
 
 Table values, Table and Column valued functions, Row and Tuple objects
@@ -1482,6 +1547,7 @@ from functools import lru_cache
 import re
 from typing import Any
 from typing import cast
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -1672,6 +1738,7 @@ RESERVED_WORDS = {
     "verbose",
 }
 
+
 colspecs = {
     sqltypes.ARRAY: _array.ARRAY,
     sqltypes.Interval: INTERVAL,
@@ -1788,6 +1855,8 @@ class PGCompiler(compiler.SQLCompiler):
         }"""
 
     def visit_array(self, element, **kw):
+        if not element.clauses and not element.type.item_type._isnull:
+            return "ARRAY[]::%s" % element.type.compile(self.dialect)
         return "ARRAY[%s]" % self.visit_clauselist(element, **kw)
 
     def visit_slice(self, element, **kw):
@@ -1811,9 +1880,23 @@ class PGCompiler(compiler.SQLCompiler):
 
         kw["eager_grouping"] = True
 
-        return self._generate_generic_binary(
-            binary, " -> " if not _cast_applied else " ->> ", **kw
-        )
+        if (
+            not _cast_applied
+            and isinstance(binary.left.type, _json.JSONB)
+            and self.dialect._supports_jsonb_subscripting
+        ):
+            # for pg14+JSONB use subscript notation: col['key'] instead
+            # of col -> 'key'
+            return "%s[%s]" % (
+                self.process(binary.left, **kw),
+                self.process(binary.right, **kw),
+            )
+        else:
+            # Fall back to arrow notation for older versions or when cast
+            # is applied
+            return self._generate_generic_binary(
+                binary, " -> " if not _cast_applied else " ->> ", **kw
+            )
 
     def visit_json_path_getitem_op_binary(
         self, binary, operator, _cast_applied=False, **kw
@@ -2233,6 +2316,18 @@ class PGDDLCompiler(compiler.DDLCompiler):
         not_valid = constraint.dialect_options["postgresql"]["not_valid"]
         return " NOT VALID" if not_valid else ""
 
+    def _define_include(self, obj):
+        includeclause = obj.dialect_options["postgresql"]["include"]
+        if not includeclause:
+            return ""
+        inclusions = [
+            obj.table.c[col] if isinstance(col, str) else col
+            for col in includeclause
+        ]
+        return " INCLUDE (%s)" % ", ".join(
+            [self.preparer.quote(c.name) for c in inclusions]
+        )
+
     def visit_check_constraint(self, constraint, **kw):
         if constraint._type_bound:
             typ = list(constraint.columns)[0].type
@@ -2255,6 +2350,29 @@ class PGDDLCompiler(compiler.DDLCompiler):
         text = super().visit_foreign_key_constraint(constraint)
         text += self._define_constraint_validity(constraint)
         return text
+
+    def visit_primary_key_constraint(self, constraint, **kw):
+        text = super().visit_primary_key_constraint(constraint)
+        text += self._define_include(constraint)
+        return text
+
+    def visit_unique_constraint(self, constraint, **kw):
+        text = super().visit_unique_constraint(constraint)
+        text += self._define_include(constraint)
+        return text
+
+    @util.memoized_property
+    def _fk_ondelete_pattern(self):
+        return re.compile(
+            r"^(?:RESTRICT|CASCADE|SET (?:NULL|DEFAULT)(?:\s*\(.+\))?"
+            r"|NO ACTION)$",
+            re.I,
+        )
+
+    def define_constraint_ondelete_cascade(self, constraint):
+        return " ON DELETE %s" % self.preparer.validate_sql_phrase(
+            constraint.ondelete, self._fk_ondelete_pattern
+        )
 
     def visit_create_enum_type(self, create, **kw):
         type_ = create.element
@@ -2357,15 +2475,7 @@ class PGDDLCompiler(compiler.DDLCompiler):
             )
         )
 
-        includeclause = index.dialect_options["postgresql"]["include"]
-        if includeclause:
-            inclusions = [
-                index.table.c[col] if isinstance(col, str) else col
-                for col in includeclause
-            ]
-            text += " INCLUDE (%s)" % ", ".join(
-                [preparer.quote(c.name) for c in inclusions]
-            )
+        text += self._define_include(index)
 
         nulls_not_distinct = index.dialect_options["postgresql"][
             "nulls_not_distinct"
@@ -3114,8 +3224,15 @@ class PGDialect(default.DefaultDialect):
             },
         ),
         (
+            schema.PrimaryKeyConstraint,
+            {"include": None},
+        ),
+        (
             schema.UniqueConstraint,
-            {"nulls_not_distinct": None},
+            {
+                "include": None,
+                "nulls_not_distinct": None,
+            },
         ),
     ]
 
@@ -3124,6 +3241,7 @@ class PGDialect(default.DefaultDialect):
     _backslash_escapes = True
     _supports_create_index_concurrently = True
     _supports_drop_index_concurrently = True
+    _supports_jsonb_subscripting = True
 
     def __init__(
         self,
@@ -3151,6 +3269,8 @@ class PGDialect(default.DefaultDialect):
             2,
         )
         self.supports_identity_columns = self.server_version_info >= (10,)
+
+        self._supports_jsonb_subscripting = self.server_version_info >= (14,)
 
     def get_isolation_level_values(self, dbapi_conn):
         # note the generic dialect doesn't have AUTOCOMMIT, however
@@ -3744,8 +3864,8 @@ class PGDialect(default.DefaultDialect):
     def _reflect_type(
         self,
         format_type: Optional[str],
-        domains: dict[str, ReflectedDomain],
-        enums: dict[str, ReflectedEnum],
+        domains: Dict[str, ReflectedDomain],
+        enums: Dict[str, ReflectedEnum],
         type_description: str,
     ) -> sqltypes.TypeEngine[Any]:
         """
@@ -3815,7 +3935,8 @@ class PGDialect(default.DefaultDialect):
                 charlen = int(attype_args[0])
                 args = (charlen,)
 
-        elif attype.startswith("interval"):
+        # a domain or enum can start with interval, so be mindful of that.
+        elif attype == "interval" or attype.startswith("interval "):
             schema_type = INTERVAL
 
             field_match = re.match(r"interval (.+)", attype)
@@ -3832,7 +3953,6 @@ class PGDialect(default.DefaultDialect):
                 schema_type = ENUM
                 enum = enums[enum_or_domain_key]
 
-                args = tuple(enum["labels"])
                 kwargs["name"] = enum["name"]
 
                 if not enum["visible"]:
@@ -3997,20 +4117,34 @@ class PGDialect(default.DefaultDialect):
         result = connection.execute(oid_q, params)
         return result.all()
 
-    @lru_cache()
-    def _constraint_query(self, is_unique):
+    @util.memoized_property
+    def _constraint_query(self):
+        if self.server_version_info >= (11, 0):
+            indnkeyatts = pg_catalog.pg_index.c.indnkeyatts
+        else:
+            indnkeyatts = pg_catalog.pg_index.c.indnatts.label("indnkeyatts")
+
+        if self.server_version_info >= (15,):
+            indnullsnotdistinct = pg_catalog.pg_index.c.indnullsnotdistinct
+        else:
+            indnullsnotdistinct = sql.false().label("indnullsnotdistinct")
+
         con_sq = (
             select(
                 pg_catalog.pg_constraint.c.conrelid,
                 pg_catalog.pg_constraint.c.conname,
-                pg_catalog.pg_constraint.c.conindid,
-                sql.func.unnest(pg_catalog.pg_constraint.c.conkey).label(
-                    "attnum"
-                ),
+                sql.func.unnest(pg_catalog.pg_index.c.indkey).label("attnum"),
                 sql.func.generate_subscripts(
-                    pg_catalog.pg_constraint.c.conkey, 1
+                    pg_catalog.pg_index.c.indkey, 1
                 ).label("ord"),
+                indnkeyatts,
+                indnullsnotdistinct,
                 pg_catalog.pg_description.c.description,
+            )
+            .join(
+                pg_catalog.pg_index,
+                pg_catalog.pg_constraint.c.conindid
+                == pg_catalog.pg_index.c.indexrelid,
             )
             .outerjoin(
                 pg_catalog.pg_description,
@@ -4020,6 +4154,9 @@ class PGDialect(default.DefaultDialect):
             .where(
                 pg_catalog.pg_constraint.c.contype == bindparam("contype"),
                 pg_catalog.pg_constraint.c.conrelid.in_(bindparam("oids")),
+                # NOTE: filtering also on pg_index.indrelid for oids does
+                # not seem to have a performance effect, but it may be an
+                # option if perf problems are reported
             )
             .subquery("con")
         )
@@ -4028,9 +4165,10 @@ class PGDialect(default.DefaultDialect):
             select(
                 con_sq.c.conrelid,
                 con_sq.c.conname,
-                con_sq.c.conindid,
                 con_sq.c.description,
                 con_sq.c.ord,
+                con_sq.c.indnkeyatts,
+                con_sq.c.indnullsnotdistinct,
                 pg_catalog.pg_attribute.c.attname,
             )
             .select_from(pg_catalog.pg_attribute)
@@ -4053,7 +4191,7 @@ class PGDialect(default.DefaultDialect):
             .subquery("attr")
         )
 
-        constraint_query = (
+        return (
             select(
                 attr_sq.c.conrelid,
                 sql.func.array_agg(
@@ -4065,30 +4203,14 @@ class PGDialect(default.DefaultDialect):
                 ).label("cols"),
                 attr_sq.c.conname,
                 sql.func.min(attr_sq.c.description).label("description"),
+                sql.func.min(attr_sq.c.indnkeyatts).label("indnkeyatts"),
+                sql.func.bool_and(attr_sq.c.indnullsnotdistinct).label(
+                    "indnullsnotdistinct"
+                ),
             )
             .group_by(attr_sq.c.conrelid, attr_sq.c.conname)
             .order_by(attr_sq.c.conrelid, attr_sq.c.conname)
         )
-
-        if is_unique:
-            if self.server_version_info >= (15,):
-                constraint_query = constraint_query.join(
-                    pg_catalog.pg_index,
-                    attr_sq.c.conindid == pg_catalog.pg_index.c.indexrelid,
-                ).add_columns(
-                    sql.func.bool_and(
-                        pg_catalog.pg_index.c.indnullsnotdistinct
-                    ).label("indnullsnotdistinct")
-                )
-            else:
-                constraint_query = constraint_query.add_columns(
-                    sql.false().label("indnullsnotdistinct")
-                )
-        else:
-            constraint_query = constraint_query.add_columns(
-                sql.null().label("extra")
-            )
-        return constraint_query
 
     def _reflect_constraint(
         self, connection, contype, schema, filter_names, scope, kind, **kw
@@ -4105,26 +4227,42 @@ class PGDialect(default.DefaultDialect):
             batches[0:3000] = []
 
             result = connection.execute(
-                self._constraint_query(is_unique),
+                self._constraint_query,
                 {"oids": [r[0] for r in batch], "contype": contype},
-            )
+            ).mappings()
 
             result_by_oid = defaultdict(list)
-            for oid, cols, constraint_name, comment, extra in result:
-                result_by_oid[oid].append(
-                    (cols, constraint_name, comment, extra)
-                )
+            for row_dict in result:
+                result_by_oid[row_dict["conrelid"]].append(row_dict)
 
             for oid, tablename in batch:
                 for_oid = result_by_oid.get(oid, ())
                 if for_oid:
-                    for cols, constraint, comment, extra in for_oid:
-                        if is_unique:
-                            yield tablename, cols, constraint, comment, {
-                                "nullsnotdistinct": extra
-                            }
+                    for row in for_oid:
+                        # See note in get_multi_indexes
+                        all_cols = row["cols"]
+                        indnkeyatts = row["indnkeyatts"]
+                        if len(all_cols) > indnkeyatts:
+                            inc_cols = all_cols[indnkeyatts:]
+                            cst_cols = all_cols[:indnkeyatts]
                         else:
-                            yield tablename, cols, constraint, comment, None
+                            inc_cols = []
+                            cst_cols = all_cols
+
+                        opts = {}
+                        if self.server_version_info >= (11,):
+                            opts["postgresql_include"] = inc_cols
+                        if is_unique:
+                            opts["postgresql_nulls_not_distinct"] = row[
+                                "indnullsnotdistinct"
+                            ]
+                        yield (
+                            tablename,
+                            cst_cols,
+                            row["conname"],
+                            row["description"],
+                            opts,
+                        )
                 else:
                     yield tablename, None, None, None, None
 
@@ -4150,20 +4288,27 @@ class PGDialect(default.DefaultDialect):
         # only a single pk can be present for each table. Return an entry
         # even if a table has no primary key
         default = ReflectionDefaults.pk_constraint
+
+        def pk_constraint(pk_name, cols, comment, opts):
+            info = {
+                "constrained_columns": cols,
+                "name": pk_name,
+                "comment": comment,
+            }
+            if opts:
+                info["dialect_options"] = opts
+            return info
+
         return (
             (
                 (schema, table_name),
                 (
-                    {
-                        "constrained_columns": [] if cols is None else cols,
-                        "name": pk_name,
-                        "comment": comment,
-                    }
+                    pk_constraint(pk_name, cols, comment, opts)
                     if pk_name is not None
                     else default()
                 ),
             )
-            for table_name, cols, pk_name, comment, _ in result
+            for table_name, cols, pk_name, comment, opts in result
         )
 
     @reflection.cache
@@ -4257,7 +4402,8 @@ class PGDialect(default.DefaultDialect):
             r"[\s]?(ON UPDATE "
             r"(CASCADE|RESTRICT|NO ACTION|SET NULL|SET DEFAULT)+)?"
             r"[\s]?(ON DELETE "
-            r"(CASCADE|RESTRICT|NO ACTION|SET NULL|SET DEFAULT)+)?"
+            r"(CASCADE|RESTRICT|NO ACTION|"
+            r"SET (?:NULL|DEFAULT)(?:\s\(.+\))?)+)?"
             r"[\s]?(DEFERRABLE|NOT DEFERRABLE)?"
             r"[\s]?(INITIALLY (DEFERRED|IMMEDIATE)+)?"
         )
@@ -4373,7 +4519,10 @@ class PGDialect(default.DefaultDialect):
 
     @util.memoized_property
     def _index_query(self):
-        pg_class_index = pg_catalog.pg_class.alias("cls_idx")
+        # NOTE: pg_index is used as from two times to improve performance,
+        # since extraing all the index information from `idx_sq` to avoid
+        # the second pg_index use leads to a worse performing query in
+        # particular when querying for a single table (as of pg 17)
         # NOTE: repeating oids clause improve query performance
 
         # subquery to get the columns
@@ -4382,6 +4531,9 @@ class PGDialect(default.DefaultDialect):
                 pg_catalog.pg_index.c.indexrelid,
                 pg_catalog.pg_index.c.indrelid,
                 sql.func.unnest(pg_catalog.pg_index.c.indkey).label("attnum"),
+                sql.func.unnest(pg_catalog.pg_index.c.indclass).label(
+                    "att_opclass"
+                ),
                 sql.func.generate_subscripts(
                     pg_catalog.pg_index.c.indkey, 1
                 ).label("ord"),
@@ -4413,6 +4565,8 @@ class PGDialect(default.DefaultDialect):
                     else_=pg_catalog.pg_attribute.c.attname.cast(TEXT),
                 ).label("element"),
                 (idx_sq.c.attnum == 0).label("is_expr"),
+                pg_catalog.pg_opclass.c.opcname,
+                pg_catalog.pg_opclass.c.opcdefault,
             )
             .select_from(idx_sq)
             .outerjoin(
@@ -4422,6 +4576,10 @@ class PGDialect(default.DefaultDialect):
                     pg_catalog.pg_attribute.c.attnum == idx_sq.c.attnum,
                     pg_catalog.pg_attribute.c.attrelid == idx_sq.c.indrelid,
                 ),
+            )
+            .outerjoin(
+                pg_catalog.pg_opclass,
+                pg_catalog.pg_opclass.c.oid == idx_sq.c.att_opclass,
             )
             .where(idx_sq.c.indrelid.in_(bindparam("oids")))
             .subquery("idx_attr")
@@ -4437,6 +4595,12 @@ class PGDialect(default.DefaultDialect):
                 sql.func.array_agg(
                     aggregate_order_by(attr_sq.c.is_expr, attr_sq.c.ord)
                 ).label("elements_is_expr"),
+                sql.func.array_agg(
+                    aggregate_order_by(attr_sq.c.opcname, attr_sq.c.ord)
+                ).label("elements_opclass"),
+                sql.func.array_agg(
+                    aggregate_order_by(attr_sq.c.opcdefault, attr_sq.c.ord)
+                ).label("elements_opdefault"),
             )
             .group_by(attr_sq.c.indexrelid)
             .subquery("idx_cols")
@@ -4445,7 +4609,7 @@ class PGDialect(default.DefaultDialect):
         if self.server_version_info >= (11, 0):
             indnkeyatts = pg_catalog.pg_index.c.indnkeyatts
         else:
-            indnkeyatts = sql.null().label("indnkeyatts")
+            indnkeyatts = pg_catalog.pg_index.c.indnatts.label("indnkeyatts")
 
         if self.server_version_info >= (15,):
             nulls_not_distinct = pg_catalog.pg_index.c.indnullsnotdistinct
@@ -4455,13 +4619,13 @@ class PGDialect(default.DefaultDialect):
         return (
             select(
                 pg_catalog.pg_index.c.indrelid,
-                pg_class_index.c.relname.label("relname_index"),
+                pg_catalog.pg_class.c.relname,
                 pg_catalog.pg_index.c.indisunique,
                 pg_catalog.pg_constraint.c.conrelid.is_not(None).label(
                     "has_constraint"
                 ),
                 pg_catalog.pg_index.c.indoption,
-                pg_class_index.c.reloptions,
+                pg_catalog.pg_class.c.reloptions,
                 pg_catalog.pg_am.c.amname,
                 # NOTE: pg_get_expr is very fast so this case has almost no
                 # performance impact
@@ -4479,6 +4643,8 @@ class PGDialect(default.DefaultDialect):
                 nulls_not_distinct,
                 cols_sq.c.elements,
                 cols_sq.c.elements_is_expr,
+                cols_sq.c.elements_opclass,
+                cols_sq.c.elements_opdefault,
             )
             .select_from(pg_catalog.pg_index)
             .where(
@@ -4486,12 +4652,12 @@ class PGDialect(default.DefaultDialect):
                 ~pg_catalog.pg_index.c.indisprimary,
             )
             .join(
-                pg_class_index,
-                pg_catalog.pg_index.c.indexrelid == pg_class_index.c.oid,
+                pg_catalog.pg_class,
+                pg_catalog.pg_index.c.indexrelid == pg_catalog.pg_class.c.oid,
             )
             .join(
                 pg_catalog.pg_am,
-                pg_class_index.c.relam == pg_catalog.pg_am.c.oid,
+                pg_catalog.pg_class.c.relam == pg_catalog.pg_am.c.oid,
             )
             .outerjoin(
                 cols_sq,
@@ -4508,7 +4674,9 @@ class PGDialect(default.DefaultDialect):
                     == sql.any_(_array.array(("p", "u", "x"))),
                 ),
             )
-            .order_by(pg_catalog.pg_index.c.indrelid, pg_class_index.c.relname)
+            .order_by(
+                pg_catalog.pg_index.c.indrelid, pg_catalog.pg_class.c.relname
+            )
         )
 
     def get_multi_indexes(
@@ -4543,17 +4711,19 @@ class PGDialect(default.DefaultDialect):
                     continue
 
                 for row in result_by_oid[oid]:
-                    index_name = row["relname_index"]
+                    index_name = row["relname"]
 
                     table_indexes = indexes[(schema, table_name)]
 
                     all_elements = row["elements"]
                     all_elements_is_expr = row["elements_is_expr"]
+                    all_elements_opclass = row["elements_opclass"]
+                    all_elements_opdefault = row["elements_opdefault"]
                     indnkeyatts = row["indnkeyatts"]
                     # "The number of key columns in the index, not counting any
                     # included columns, which are merely stored and do not
                     # participate in the index semantics"
-                    if indnkeyatts and len(all_elements) > indnkeyatts:
+                    if len(all_elements) > indnkeyatts:
                         # this is a "covering index" which has INCLUDE columns
                         # as well as regular index columns
                         inc_cols = all_elements[indnkeyatts:]
@@ -4568,10 +4738,18 @@ class PGDialect(default.DefaultDialect):
                             not is_expr
                             for is_expr in all_elements_is_expr[indnkeyatts:]
                         )
+                        idx_elements_opclass = all_elements_opclass[
+                            :indnkeyatts
+                        ]
+                        idx_elements_opdefault = all_elements_opdefault[
+                            :indnkeyatts
+                        ]
                     else:
                         idx_elements = all_elements
                         idx_elements_is_expr = all_elements_is_expr
                         inc_cols = []
+                        idx_elements_opclass = all_elements_opclass
+                        idx_elements_opdefault = all_elements_opdefault
 
                     index = {"name": index_name, "unique": row["indisunique"]}
                     if any(idx_elements_is_expr):
@@ -4584,6 +4762,19 @@ class PGDialect(default.DefaultDialect):
                         index["expressions"] = idx_elements
                     else:
                         index["column_names"] = idx_elements
+
+                    dialect_options = {}
+
+                    if not all(idx_elements_opdefault):
+                        dialect_options["postgresql_ops"] = {
+                            name: opclass
+                            for name, opclass, is_default in zip(
+                                idx_elements,
+                                idx_elements_opclass,
+                                idx_elements_opdefault,
+                            )
+                            if not is_default
+                        }
 
                     sorting = {}
                     for col_index, col_flags in enumerate(row["indoption"]):
@@ -4604,7 +4795,6 @@ class PGDialect(default.DefaultDialect):
                     if row["has_constraint"]:
                         index["duplicates_constraint"] = index_name
 
-                    dialect_options = {}
                     if row["reloptions"]:
                         dialect_options["postgresql_with"] = dict(
                             [
@@ -4683,12 +4873,7 @@ class PGDialect(default.DefaultDialect):
                 "comment": comment,
             }
             if options:
-                if options["nullsnotdistinct"]:
-                    uc_dict["dialect_options"] = {
-                        "postgresql_nulls_not_distinct": options[
-                            "nullsnotdistinct"
-                        ]
-                    }
+                uc_dict["dialect_options"] = options
 
             uniques[(schema, table_name)].append(uc_dict)
         return uniques.items()

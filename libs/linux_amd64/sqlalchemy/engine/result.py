@@ -724,6 +724,14 @@ class ResultInternal(InPlaceGenerative, Generic[_R]):
 
     @overload
     def _only_one_row(
+        self: ResultInternal[Row[Any]],
+        raise_for_second_row: bool,
+        raise_for_none: bool,
+        scalar: Literal[True],
+    ) -> Any: ...
+
+    @overload
+    def _only_one_row(
         self,
         raise_for_second_row: bool,
         raise_for_none: Literal[True],
@@ -809,7 +817,6 @@ class ResultInternal(InPlaceGenerative, Generic[_R]):
                     "was required"
                 )
         else:
-            next_row = _NO_ROW
             # if we checked for second row then that would have
             # closed us :)
             self._soft_close(hard=True)
@@ -1489,8 +1496,8 @@ class Result(_WithKeys, ResultInternal[Row[_TP]]):
     def one(self) -> Row[_TP]:
         """Return exactly one row or raise an exception.
 
-        Raises :class:`.NoResultFound` if the result returns no
-        rows, or :class:`.MultipleResultsFound` if multiple rows
+        Raises :class:`_exc.NoResultFound` if the result returns no
+        rows, or :class:`_exc.MultipleResultsFound` if multiple rows
         would be returned.
 
         .. note::  This method returns one **row**, e.g. tuple, by default.
@@ -2006,7 +2013,7 @@ class MappingResult(_WithKeys, FilterResult[RowMapping]):
         return self
 
     def columns(self, *col_expressions: _KeyIndexType) -> Self:
-        r"""Establish the columns that should be returned in each row."""
+        """Establish the columns that should be returned in each row."""
         return self._column_slices(col_expressions)
 
     def partitions(

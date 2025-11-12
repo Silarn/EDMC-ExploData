@@ -825,7 +825,7 @@ class AsyncTupleResult(AsyncCommon[_R], util.TypingOnly):
             """
             ...
 
-        async def __aiter__(self) -> AsyncIterator[_R]: ...
+        def __aiter__(self) -> AsyncIterator[_R]: ...
 
         async def __anext__(self) -> _R: ...
 
@@ -959,4 +959,7 @@ async def _ensure_sync_result(result: _RT, calling_method: Any) -> _RT:
                 calling_method.__self__.__class__.__name__,
             )
         )
+
+    if is_cursor and cursor_result.cursor is not None:
+        await cursor_result.cursor._async_soft_close()
     return result

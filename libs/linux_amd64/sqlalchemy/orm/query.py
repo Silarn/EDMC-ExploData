@@ -2787,11 +2787,10 @@ class Query(
     def one(self) -> _T:
         """Return exactly one result or raise an exception.
 
-        Raises ``sqlalchemy.orm.exc.NoResultFound`` if the query selects
-        no rows.  Raises ``sqlalchemy.orm.exc.MultipleResultsFound``
-        if multiple object identities are returned, or if multiple
-        rows are returned for a query that returns only scalar values
-        as opposed to full identity-mapped entities.
+        Raises :class:`_exc.NoResultFound` if the query selects no rows.
+        Raises :class:`_exc.MultipleResultsFound` if multiple object identities
+        are returned, or if multiple rows are returned for a query that returns
+        only scalar values as opposed to full identity-mapped entities.
 
         Calling :meth:`.one` results in an execution of the underlying query.
 
@@ -2811,7 +2810,7 @@ class Query(
     def scalar(self) -> Any:
         """Return the first element of the first result or None
         if no rows present.  If multiple rows are returned,
-        raises MultipleResultsFound.
+        raises :class:`_exc.MultipleResultsFound`.
 
           >>> session.query(Item).scalar()
           <Item>
@@ -3206,11 +3205,14 @@ class Query(
             delete_ = delete_.with_dialect_options(**delete_args)
 
         delete_._where_criteria = self._where_criteria
-        result: CursorResult[Any] = self.session.execute(
-            delete_,
-            self._params,
-            execution_options=self._execution_options.union(
-                {"synchronize_session": synchronize_session}
+        result = cast(
+            "CursorResult[Any]",
+            self.session.execute(
+                delete_,
+                self._params,
+                execution_options=self._execution_options.union(
+                    {"synchronize_session": synchronize_session}
+                ),
             ),
         )
         bulk_del.result = result  # type: ignore
@@ -3297,11 +3299,14 @@ class Query(
             upd = upd.with_dialect_options(**update_args)
 
         upd._where_criteria = self._where_criteria
-        result: CursorResult[Any] = self.session.execute(
-            upd,
-            self._params,
-            execution_options=self._execution_options.union(
-                {"synchronize_session": synchronize_session}
+        result = cast(
+            "CursorResult[Any]",
+            self.session.execute(
+                upd,
+                self._params,
+                execution_options=self._execution_options.union(
+                    {"synchronize_session": synchronize_session}
+                ),
             ),
         )
         bulk_ud.result = result  # type: ignore

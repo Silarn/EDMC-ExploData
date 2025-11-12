@@ -102,7 +102,6 @@ if typing.TYPE_CHECKING:
     from .mapper import Mapper
     from .path_registry import PathRegistry
     from .query import RowReturningQuery
-    from ..engine import CursorResult
     from ..engine import Result
     from ..engine import Row
     from ..engine import RowMapping
@@ -127,7 +126,6 @@ if typing.TYPE_CHECKING:
     from ..sql._typing import _TypedColumnClauseArgument as _TCCA
     from ..sql.base import Executable
     from ..sql.base import ExecutableOption
-    from ..sql.dml import UpdateBase
     from ..sql.elements import ClauseElement
     from ..sql.roles import TypedColumnsClauseRole
     from ..sql.selectable import ForUpdateParameter
@@ -2281,18 +2279,6 @@ class Session(_SessionClassMethods, EventTarget):
     @overload
     def execute(
         self,
-        statement: UpdateBase,
-        params: Optional[_CoreAnyExecuteParams] = None,
-        *,
-        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
-        bind_arguments: Optional[_BindArguments] = None,
-        _parent_execute_state: Optional[Any] = None,
-        _add_event: Optional[Any] = None,
-    ) -> CursorResult[Any]: ...
-
-    @overload
-    def execute(
-        self,
         statement: Executable,
         params: Optional[_CoreAnyExecuteParams] = None,
         *,
@@ -3045,7 +3031,7 @@ class Session(_SessionClassMethods, EventTarget):
         "This warning originated from the Session 'autoflush' process, "
         "which was invoked automatically in response to a user-initiated "
         "operation. Consider using ``no_autoflush`` context manager if this "
-        "warning happended while initializing objects.",
+        "warning happened while initializing objects.",
         sa_exc.SAWarning,
     )
     def _autoflush(self) -> None:
@@ -3718,8 +3704,7 @@ class Session(_SessionClassMethods, EventTarget):
         """Return exactly one instance based on the given primary key
         identifier, or raise an exception if not found.
 
-        Raises ``sqlalchemy.orm.exc.NoResultFound`` if the query
-        selects no rows.
+        Raises :class:`_exc.NoResultFound` if the query selects no rows.
 
         For a detailed documentation of the arguments see the
         method :meth:`.Session.get`.
@@ -4015,14 +4000,7 @@ class Session(_SessionClassMethods, EventTarget):
         else:
             key_is_persistent = True
 
-        if key in self.identity_map:
-            try:
-                merged = self.identity_map[key]
-            except KeyError:
-                # object was GC'ed right as we checked for it
-                merged = None
-        else:
-            merged = None
+        merged = self.identity_map.get(key)
 
         if merged is None:
             if key_is_persistent and key in _resolve_conflict_map:

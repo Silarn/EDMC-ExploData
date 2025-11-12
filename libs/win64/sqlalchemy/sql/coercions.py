@@ -75,7 +75,7 @@ _StringOnlyR = TypeVar("_StringOnlyR", bound=roles.StringRole)
 _T = TypeVar("_T", bound=Any)
 
 
-def _is_literal(element):
+def _is_literal(element: Any) -> bool:
     """Return whether or not the element is a "literal" in the context
     of a SQL expression construct.
 
@@ -843,7 +843,7 @@ class InElementImpl(RoleImpl):
         )
 
     @util.preload_module("sqlalchemy.sql.elements")
-    def _literal_coercion(self, element, *, expr, operator, **kw):
+    def _literal_coercion(self, element, *, expr, operator, **kw):  # type: ignore[override] # noqa: E501
         if util.is_non_string_iterable(element):
             non_literal_expressions: Dict[
                 Optional[_ColumnExpressionArgument[Any]],

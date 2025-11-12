@@ -231,7 +231,7 @@ class AbstractORMCompileState(CompileState):
         if compiler is None:
             # this is the legacy / testing only ORM _compile_state() use case.
             # there is no need to apply criteria options for this.
-            self.global_attributes = ga = {}
+            self.global_attributes = {}
             assert toplevel
             return
         else:
@@ -1864,8 +1864,6 @@ class ORMSelectCompileState(ORMCompileState, SelectState):
                         "selectable/table as join target"
                     )
 
-            of_type = None
-
             if isinstance(onclause, interfaces.PropComparator):
                 # descriptor/property given (or determined); this tells us
                 # explicitly what the expected "left" side of the join is.
@@ -2527,7 +2525,7 @@ def _column_descriptions(
 
 
 def _legacy_filter_by_entity_zero(
-    query_or_augmented_select: Union[Query[Any], Select[Any]]
+    query_or_augmented_select: Union[Query[Any], Select[Any]],
 ) -> Optional[_InternalEntityType[Any]]:
     self = query_or_augmented_select
     if self._setup_joins:
@@ -2542,7 +2540,7 @@ def _legacy_filter_by_entity_zero(
 
 
 def _entity_from_pre_ent_zero(
-    query_or_augmented_select: Union[Query[Any], Select[Any]]
+    query_or_augmented_select: Union[Query[Any], Select[Any]],
 ) -> Optional[_InternalEntityType[Any]]:
     self = query_or_augmented_select
     if not self._raw_columns:
