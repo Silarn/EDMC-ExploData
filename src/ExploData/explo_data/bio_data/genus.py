@@ -749,4 +749,5 @@ data: Mapping[str, Mapping[str, any]] = {
         }
     },
     '$Codex_Ent_Vents_Name;': {'name': 'Amphora Plant', 'distance': 100, 'multiple': False},
+    "$Codex_Ent_Ingensradices_Genus_Name;": {'name': 'Radicoida', 'distance': 100, 'multiple': False},
 }
