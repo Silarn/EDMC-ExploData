@@ -220,7 +220,7 @@ class PlanetData:
         self.commit()
         return self
 
-    def set_flora_species_scan(self, genus: str, species: str, scan: int, commander: int) -> Self:
+    def set_flora_species_scan(self, genus: str, species: str, was_logged: Optional[bool], scan: int, commander: int) -> Self:
         flora = self.get_flora(genus, species, create=True)[0]
         flora.species = species
         stmt = select(FloraScans).where(FloraScans.flora_id == flora.id).where(FloraScans.commander_id == commander)
@@ -233,6 +233,7 @@ class PlanetData:
         if scan == 3:
             stmt = delete(Waypoint).where(Waypoint.commander_id == commander).where(Waypoint.flora_id == flora.id)
             self._session.execute(stmt)
+        scan_data.was_logged = was_logged
         self.commit()
         return self
 
@@ -364,6 +365,26 @@ class PlanetData:
     def set_was_discovered(self, value: bool, commander_id: int) -> Self:
         status = self.get_status(commander_id)
         status.was_discovered = value
+        self.commit()
+        return self
+
+    def footfall(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.footfall
+
+    def set_footfall(self, value: Optional[bool], commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.footfall = value
+        self.commit()
+        return self
+
+    def was_footfalled(self, commander_id: int) -> bool:
+        status = self.get_status(commander_id)
+        return status.was_footfalled
+
+    def set_was_footfalled(self, value: Optional[bool], commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.was_footfalled = value
         self.commit()
         return self
 

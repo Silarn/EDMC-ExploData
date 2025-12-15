@@ -194,6 +194,8 @@ class PlanetStatus(Base):
     was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    footfall: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    was_footfalled: Mapped[Optional[bool]] = mapped_column(default=False, nullable=True)
     efficient: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     scan_state: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
@@ -259,6 +261,7 @@ class FloraScans(Base):
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
     count: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    was_logged: Mapped[Optional[bool]] = mapped_column(default=False, nullable=True)
     __table_args__ = (UniqueConstraint('commander_id', 'flora_id', name='_cmdr_flora_constraint'),
                       )
 
@@ -516,9 +519,13 @@ DELETE FROM planets WHERE ROWID IN (
             if int(version['value']) < 7:
                 add_column(engine, 'star_status', Column('scan_state', Integer(), nullable=False, server_default=text('0')))
             if int(version['value']) < 8:
-                run_query(engine, 'DELETE FROM journal_log')
                 run_query(engine, 'UPDATE planet_status SET scan_state=0 WHERE scan_state<4')
                 run_query(engine, 'UPDATE star_status SET scan_state=0 WHERE scan_state<4')
+            if int(version['value']) < 10:
+                add_column(engine, 'planet_status', Column('footfall', Boolean(), nullable=False, server_default=text('FALSE')))
+                add_column(engine, 'planet_status', Column('was_footfalled', Boolean(), nullable=True))
+                add_column(engine, 'flora_scans', Column('was_logged', Boolean(), nullable=True))
+                run_query(engine, 'DELETE FROM journal_log')
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
