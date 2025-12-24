@@ -234,7 +234,7 @@ class JournalParse:
                         target_body.add_geo(entry['Name'])
                     elif entry['SubCategory'] == '$Codex_SubCategory_Organic_Structures;':
                         genus, species, color = parse_variant(entry['Name'])
-                        if genus is not '' and species is not '':
+                        if genus != '' and species != '':
                             target_body.add_flora(genus, species, color)
 
                     if self._cmdr and self._system:
