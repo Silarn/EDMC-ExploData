@@ -1,14 +1,11 @@
 # sql/visitors.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
 # the MIT License: https://www.opensource.org/licenses/mit-license.php
 
-"""Visitor/traversal interface and library functions.
-
-
-"""
+"""Visitor/traversal interface and library functions."""
 
 from __future__ import annotations
 
@@ -934,10 +931,12 @@ def traverse(
 
         from sqlalchemy.sql import visitors
 
-        stmt = select(some_table).where(some_table.c.foo == 'bar')
+        stmt = select(some_table).where(some_table.c.foo == "bar")
+
 
         def visit_bindparam(bind_param):
             print("found bound value: %s" % bind_param.value)
+
 
         visitors.traverse(stmt, {}, {"bindparam": visit_bindparam})
 

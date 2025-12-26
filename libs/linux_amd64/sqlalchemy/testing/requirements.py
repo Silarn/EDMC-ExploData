@@ -1,5 +1,5 @@
 # testing/requirements.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -19,6 +19,7 @@ to provide specific inclusion/exclusions.
 
 from __future__ import annotations
 
+import os
 import platform
 
 from . import asyncio as _test_asyncio
@@ -91,7 +92,9 @@ class SuiteRequirements(Requirements):
 
     @property
     def table_value_constructor(self):
-        """Database / dialect supports a query like::
+        """Database / dialect supports a query like:
+
+        .. sourcecode:: sql
 
              SELECT * FROM VALUES ( (c1, c2), (c1, c2), ...)
              AS some_table(col1, col2)
@@ -309,6 +312,13 @@ class SuiteRequirements(Requirements):
         or DELETE statement which refers to the CTE in a correlated subquery.
 
         """
+
+        return exclusions.closed()
+
+    @property
+    def ctes_with_values(self):
+        """target database supports CTES that ride on top of a VALUES
+        clause."""
 
         return exclusions.closed()
 
@@ -656,6 +666,12 @@ class SuiteRequirements(Requirements):
         return exclusions.closed()
 
     @property
+    def temp_table_comment_reflection(self):
+        """indicates if database supports comments on temp tables and
+        the dialect can reflect them"""
+        return exclusions.closed()
+
+    @property
     def comment_reflection(self):
         """Indicates if the database support table comment reflection"""
         return exclusions.closed()
@@ -781,6 +797,11 @@ class SuiteRequirements(Requirements):
         return exclusions.closed()
 
     @property
+    def indexes_check_column_order(self):
+        """target database supports CREATE INDEX with column order check."""
+        return exclusions.closed()
+
+    @property
     def indexes_with_expressions(self):
         """target database supports CREATE INDEX against SQL expressions."""
         return exclusions.closed()
@@ -819,6 +840,11 @@ class SuiteRequirements(Requirements):
         """Target database must support VARCHAR with no length"""
 
         return exclusions.open()
+
+    @property
+    def nvarchar_types(self):
+        """target database supports NVARCHAR and NCHAR as an actual datatype"""
+        return exclusions.closed()
 
     @property
     def unicode_data_no_special_types(self):
@@ -992,7 +1018,9 @@ class SuiteRequirements(Requirements):
     @property
     def binary_literals(self):
         """target backend supports simple binary literals, e.g. an
-        expression like::
+        expression like:
+
+        .. sourcecode:: sql
 
             SELECT CAST('foo' AS BINARY)
 
@@ -1008,6 +1036,13 @@ class SuiteRequirements(Requirements):
     @property
     def autocommit(self):
         """target dialect supports 'AUTOCOMMIT' as an isolation_level"""
+        return exclusions.closed()
+
+    @property
+    def skip_autocommit_rollback(self):
+        """target dialect supports the detect_autocommit_setting() method and
+        uses the default implementation of do_rollback()"""
+
         return exclusions.closed()
 
     @property
@@ -1165,6 +1200,19 @@ class SuiteRequirements(Requirements):
         return self.precision_numerics_many_significant_digits
 
     @property
+    def server_defaults(self):
+        """Target backend supports server side defaults for columns"""
+
+        return exclusions.closed()
+
+    @property
+    def expression_server_defaults(self):
+        """Target backend supports server side defaults with SQL expressions
+        for columns"""
+
+        return exclusions.closed()
+
+    @property
     def implicit_decimal_binds(self):
         """target backend will return a selected Decimal as a Decimal, not
         a string.
@@ -1173,9 +1221,7 @@ class SuiteRequirements(Requirements):
 
             expr = decimal.Decimal("15.7563")
 
-            value = e.scalar(
-                select(literal(expr))
-            )
+            value = e.scalar(select(literal(expr)))
 
             assert value == expr
 
@@ -1343,7 +1389,9 @@ class SuiteRequirements(Requirements):
         present in a subquery in the WHERE clause.
 
         This is an ANSI-standard syntax that apparently MySQL can't handle,
-        such as::
+        such as:
+
+        .. sourcecode:: sql
 
             UPDATE documents SET flag=1 WHERE documents.title IN
                 (SELECT max(documents.title) AS title
@@ -1376,7 +1424,11 @@ class SuiteRequirements(Requirements):
         """target database supports ordering by a column from a SELECT
         inside of a UNION
 
-        E.g.  (SELECT id, ...) UNION (SELECT id, ...) ORDER BY id
+        E.g.:
+
+        .. sourcecode:: sql
+
+            (SELECT id, ...) UNION (SELECT id, ...) ORDER BY id
 
         """
         return exclusions.open()
@@ -1386,7 +1438,9 @@ class SuiteRequirements(Requirements):
         """target backend supports ORDER BY a column label within an
         expression.
 
-        Basically this::
+        Basically this:
+
+        .. sourcecode:: sql
 
             select data as foo from test order by foo || 'bar'
 
@@ -1476,6 +1530,10 @@ class SuiteRequirements(Requirements):
         return config.add_to_marker.timing_intensive
 
     @property
+    def posix(self):
+        return exclusions.skip_if(lambda: os.name != "posix")
+
+    @property
     def memory_intensive(self):
         from . import config
 
@@ -1517,6 +1575,27 @@ class SuiteRequirements(Requirements):
         return exclusions.skip_if(check)
 
     @property
+    def up_to_date_typealias_type(self):
+        # this checks a particular quirk found in typing_extensions <=4.12.0
+        # using older python versions like 3.10 or 3.9, we use TypeAliasType
+        # from typing_extensions which does not provide for sufficient
+        # introspection prior to 4.13.0
+        def check(config):
+            import typing
+            import typing_extensions
+
+            TypeAliasType = getattr(
+                typing, "TypeAliasType", typing_extensions.TypeAliasType
+            )
+            TV = typing.TypeVar("TV")
+            TA_generic = TypeAliasType(  # type: ignore
+                "TA_generic", typing.List[TV], type_params=(TV,)
+            )
+            return hasattr(TA_generic[int], "__value__")
+
+        return exclusions.only_if(check)
+
+    @property
     def python38(self):
         return exclusions.only_if(
             lambda: util.py38, "Python 3.8 or above required"
@@ -1547,9 +1626,35 @@ class SuiteRequirements(Requirements):
         )
 
     @property
+    def fail_python314b1(self):
+        return exclusions.fails_if(
+            lambda: util.compat.py314b1, "Fails as of python 3.14.0b1"
+        )
+
+    @property
+    def not_python314(self):
+        """This requirement is interim to assist with backporting of
+        issue #12405.
+
+        SQLAlchemy 2.0 still includes the ``await_fallback()`` method that
+        makes use of ``asyncio.get_event_loop_policy()``.  This is removed
+        in SQLAlchemy 2.1.
+
+        """
+        return exclusions.skip_if(
+            lambda: util.py314, "Python 3.14 or above not supported"
+        )
+
+    @property
     def cpython(self):
         return exclusions.only_if(
             lambda: util.cpython, "cPython interpreter needed"
+        )
+
+    @property
+    def gil_enabled(self):
+        return exclusions.only_if(
+            lambda: not util.freethreading, "GIL-enabled build needed"
         )
 
     @property
@@ -1574,7 +1679,7 @@ class SuiteRequirements(Requirements):
         gc.collect() is called, as well as clean out unreferenced subclasses.
 
         """
-        return self.cpython
+        return self.cpython + self.gil_enabled
 
     @property
     def no_coverage(self):
@@ -1816,3 +1921,9 @@ class SuiteRequirements(Requirements):
     def supports_bitwise_shift(self):
         """Target database supports bitwise left or right shift"""
         return exclusions.closed()
+
+    @property
+    def like_escapes(self):
+        """Target backend supports custom ESCAPE characters
+        with LIKE comparisons"""
+        return exclusions.open()

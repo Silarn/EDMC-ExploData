@@ -1,5 +1,5 @@
 # orm/session.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -102,7 +102,6 @@ if typing.TYPE_CHECKING:
     from .mapper import Mapper
     from .path_registry import PathRegistry
     from .query import RowReturningQuery
-    from ..engine import CursorResult
     from ..engine import Result
     from ..engine import Row
     from ..engine import RowMapping
@@ -127,7 +126,6 @@ if typing.TYPE_CHECKING:
     from ..sql._typing import _TypedColumnClauseArgument as _TCCA
     from ..sql.base import Executable
     from ..sql.base import ExecutableOption
-    from ..sql.dml import UpdateBase
     from ..sql.elements import ClauseElement
     from ..sql.roles import TypedColumnsClauseRole
     from ..sql.selectable import ForUpdateParameter
@@ -1569,12 +1567,16 @@ class Session(_SessionClassMethods, EventTarget):
            operation.    The complete heuristics for resolution are
            described at :meth:`.Session.get_bind`.  Usage looks like::
 
-            Session = sessionmaker(binds={
-                SomeMappedClass: create_engine('postgresql+psycopg2://engine1'),
-                SomeDeclarativeBase: create_engine('postgresql+psycopg2://engine2'),
-                some_mapper: create_engine('postgresql+psycopg2://engine3'),
-                some_table: create_engine('postgresql+psycopg2://engine4'),
-                })
+            Session = sessionmaker(
+                binds={
+                    SomeMappedClass: create_engine("postgresql+psycopg2://engine1"),
+                    SomeDeclarativeBase: create_engine(
+                        "postgresql+psycopg2://engine2"
+                    ),
+                    some_mapper: create_engine("postgresql+psycopg2://engine3"),
+                    some_table: create_engine("postgresql+psycopg2://engine4"),
+                }
+            )
 
            .. seealso::
 
@@ -1769,7 +1771,7 @@ class Session(_SessionClassMethods, EventTarget):
 
         # the idea is that at some point NO_ARG will warn that in the future
         # the default will switch to close_resets_only=False.
-        if close_resets_only or close_resets_only is _NoArg.NO_ARG:
+        if close_resets_only in (True, _NoArg.NO_ARG):
             self._close_state = _SessionCloseState.CLOSE_IS_RESET
         else:
             self._close_state = _SessionCloseState.ACTIVE
@@ -2277,18 +2279,6 @@ class Session(_SessionClassMethods, EventTarget):
     @overload
     def execute(
         self,
-        statement: UpdateBase,
-        params: Optional[_CoreAnyExecuteParams] = None,
-        *,
-        execution_options: OrmExecuteOptionsParameter = util.EMPTY_DICT,
-        bind_arguments: Optional[_BindArguments] = None,
-        _parent_execute_state: Optional[Any] = None,
-        _add_event: Optional[Any] = None,
-    ) -> CursorResult[Any]: ...
-
-    @overload
-    def execute(
-        self,
         statement: Executable,
         params: Optional[_CoreAnyExecuteParams] = None,
         *,
@@ -2316,9 +2306,8 @@ class Session(_SessionClassMethods, EventTarget):
         E.g.::
 
             from sqlalchemy import select
-            result = session.execute(
-                select(User).where(User.id == 5)
-            )
+
+            result = session.execute(select(User).where(User.id == 5))
 
         The API contract of :meth:`_orm.Session.execute` is similar to that
         of :meth:`_engine.Connection.execute`, the :term:`2.0 style` version
@@ -2970,7 +2959,7 @@ class Session(_SessionClassMethods, EventTarget):
 
         e.g.::
 
-            obj = session._identity_lookup(inspect(SomeClass), (1, ))
+            obj = session._identity_lookup(inspect(SomeClass), (1,))
 
         :param mapper: mapper in use
         :param primary_key_identity: the primary key we are searching for, as
@@ -3041,7 +3030,8 @@ class Session(_SessionClassMethods, EventTarget):
     @util.langhelpers.tag_method_for_warnings(
         "This warning originated from the Session 'autoflush' process, "
         "which was invoked automatically in response to a user-initiated "
-        "operation.",
+        "operation. Consider using ``no_autoflush`` context manager if this "
+        "warning happened while initializing objects.",
         sa_exc.SAWarning,
     )
     def _autoflush(self) -> None:
@@ -3597,10 +3587,7 @@ class Session(_SessionClassMethods, EventTarget):
 
             some_object = session.get(VersionedFoo, (5, 10))
 
-            some_object = session.get(
-                VersionedFoo,
-                {"id": 5, "version_id": 10}
-            )
+            some_object = session.get(VersionedFoo, {"id": 5, "version_id": 10})
 
         .. versionadded:: 1.4 Added :meth:`_orm.Session.get`, which is moved
            from the now legacy :meth:`_orm.Query.get` method.
@@ -3689,7 +3676,7 @@ class Session(_SessionClassMethods, EventTarget):
 
         :return: The object instance, or ``None``.
 
-        """
+        """  # noqa: E501
         return self._get_impl(
             entity,
             ident,
@@ -3717,8 +3704,7 @@ class Session(_SessionClassMethods, EventTarget):
         """Return exactly one instance based on the given primary key
         identifier, or raise an exception if not found.
 
-        Raises ``sqlalchemy.orm.exc.NoResultFound`` if the query
-        selects no rows.
+        Raises :class:`_exc.NoResultFound` if the query selects no rows.
 
         For a detailed documentation of the arguments see the
         method :meth:`.Session.get`.
@@ -4014,14 +4000,7 @@ class Session(_SessionClassMethods, EventTarget):
         else:
             key_is_persistent = True
 
-        if key in self.identity_map:
-            try:
-                merged = self.identity_map[key]
-            except KeyError:
-                # object was GC'ed right as we checked for it
-                merged = None
-        else:
-            merged = None
+        merged = self.identity_map.get(key)
 
         if merged is None:
             if key_is_persistent and key in _resolve_conflict_map:
@@ -4942,7 +4921,7 @@ class sessionmaker(_SessionClassMethods, Generic[_S]):
 
         # an Engine, which the Session will use for connection
         # resources
-        engine = create_engine('postgresql+psycopg2://scott:tiger@localhost/')
+        engine = create_engine("postgresql+psycopg2://scott:tiger@localhost/")
 
         Session = sessionmaker(engine)
 
@@ -4995,7 +4974,7 @@ class sessionmaker(_SessionClassMethods, Generic[_S]):
 
         with engine.connect() as connection:
             with Session(bind=connection) as session:
-                # work with session
+                ...  # work with session
 
     The class also includes a method :meth:`_orm.sessionmaker.configure`, which
     can be used to specify additional keyword arguments to the factory, which
@@ -5010,7 +4989,7 @@ class sessionmaker(_SessionClassMethods, Generic[_S]):
 
         # ... later, when an engine URL is read from a configuration
         # file or other events allow the engine to be created
-        engine = create_engine('sqlite:///foo.db')
+        engine = create_engine("sqlite:///foo.db")
         Session.configure(bind=engine)
 
         sess = Session()
@@ -5148,7 +5127,7 @@ class sessionmaker(_SessionClassMethods, Generic[_S]):
 
             Session = sessionmaker()
 
-            Session.configure(bind=create_engine('sqlite://'))
+            Session.configure(bind=create_engine("sqlite://"))
         """
         self.kw.update(new_kw)
 

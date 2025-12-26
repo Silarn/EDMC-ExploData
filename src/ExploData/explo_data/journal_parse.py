@@ -234,11 +234,27 @@ class JournalParse:
                         target_body.add_geo(entry['Name'])
                     elif entry['SubCategory'] == '$Codex_SubCategory_Organic_Structures;':
                         genus, species, color = parse_variant(entry['Name'])
-                        if genus is not '' and species is not '':
+                        if genus != '' and species != '':
                             target_body.add_flora(genus, species, color)
 
-                    if self._cmdr:
+                    if self._cmdr and self._system:
                         set_codex(self._cmdr.id, entry['Name'], self._system.region)
+            case 'disembark':
+                if entry.get('OnPlanet', False):
+                    if not self._system or not self._cmdr:
+                        return
+                    self._system = self._session.merge(self._system)
+                    self._cmdr = self._session.merge(self._cmdr)
+                    planet: Planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
+                                                          .where(Planet.body_id == entry['BodyID']))
+
+                    if not planet:
+                        return
+
+                    target_body = PlanetData(self._system, planet, self._session)
+
+                    if self._cmdr:
+                        target_body.set_footfall(True, self._cmdr.id)
 
     def get_body_name(self, fullname: str) -> str:
         """
@@ -360,6 +376,7 @@ class JournalParse:
             body_data.set_discovered(True, self._cmdr.id) \
                 .set_was_discovered(entry.get('WasDiscovered', False), self._cmdr.id) \
                 .set_was_mapped(entry.get('WasMapped', False), self._cmdr.id) \
+                .set_was_footfalled(entry.get('WasFootfalled', None), self._cmdr.id) \
                 .set_scan_state(scan_type, self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
@@ -436,7 +453,7 @@ class JournalParse:
 
         if scan_level == 3 and self._cmdr:
             target_body.set_flora_species_scan(
-                entry['Genus'], entry['Species'], scan_level, self._cmdr.id
+                entry['Genus'], entry['Species'], entry.get('WasLogged', None), scan_level, self._cmdr.id
             )
 
         if 'Variant' in entry:

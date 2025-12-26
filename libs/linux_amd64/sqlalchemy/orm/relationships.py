@@ -1,5 +1,5 @@
 # orm/relationships.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -486,8 +486,7 @@ class RelationshipProperty(
         else:
             self._overlaps = ()
 
-        # mypy ignoring the @property setter
-        self.cascade = cascade  # type: ignore
+        self.cascade = cascade
 
         self.back_populates = back_populates
 
@@ -709,12 +708,16 @@ class RelationshipProperty(
         def __eq__(self, other: Any) -> ColumnElement[bool]:  # type: ignore[override]  # noqa: E501
             """Implement the ``==`` operator.
 
-            In a many-to-one context, such as::
+            In a many-to-one context, such as:
+
+            .. sourcecode:: text
 
               MyClass.some_prop == <some object>
 
             this will typically produce a
-            clause such as::
+            clause such as:
+
+            .. sourcecode:: text
 
               mytable.related_id == <some id>
 
@@ -877,11 +880,12 @@ class RelationshipProperty(
             An expression like::
 
                 session.query(MyClass).filter(
-                    MyClass.somereference.any(SomeRelated.x==2)
+                    MyClass.somereference.any(SomeRelated.x == 2)
                 )
 
+            Will produce a query like:
 
-            Will produce a query like::
+            .. sourcecode:: sql
 
                 SELECT * FROM my_table WHERE
                 EXISTS (SELECT 1 FROM related WHERE related.my_id=my_table.id
@@ -895,11 +899,11 @@ class RelationshipProperty(
             :meth:`~.Relationship.Comparator.any` is particularly
             useful for testing for empty collections::
 
-                session.query(MyClass).filter(
-                    ~MyClass.somereference.any()
-                )
+                session.query(MyClass).filter(~MyClass.somereference.any())
 
-            will produce::
+            will produce:
+
+            .. sourcecode:: sql
 
                 SELECT * FROM my_table WHERE
                 NOT (EXISTS (SELECT 1 FROM related WHERE
@@ -930,11 +934,12 @@ class RelationshipProperty(
             An expression like::
 
                 session.query(MyClass).filter(
-                    MyClass.somereference.has(SomeRelated.x==2)
+                    MyClass.somereference.has(SomeRelated.x == 2)
                 )
 
+            Will produce a query like:
 
-            Will produce a query like::
+            .. sourcecode:: sql
 
                 SELECT * FROM my_table WHERE
                 EXISTS (SELECT 1 FROM related WHERE
@@ -973,7 +978,9 @@ class RelationshipProperty(
 
                 MyClass.contains(other)
 
-            Produces a clause like::
+            Produces a clause like:
+
+            .. sourcecode:: sql
 
                 mytable.id == <some id>
 
@@ -993,7 +1000,9 @@ class RelationshipProperty(
 
                 query(MyClass).filter(MyClass.contains(other))
 
-            Produces a query like::
+            Produces a query like:
+
+            .. sourcecode:: sql
 
                 SELECT * FROM my_table, my_association_table AS
                 my_association_table_1 WHERE
@@ -1089,11 +1098,15 @@ class RelationshipProperty(
         def __ne__(self, other: Any) -> ColumnElement[bool]:  # type: ignore[override]  # noqa: E501
             """Implement the ``!=`` operator.
 
-            In a many-to-one context, such as::
+            In a many-to-one context, such as:
+
+            .. sourcecode:: text
 
               MyClass.some_prop != <some object>
 
-            This will typically produce a clause such as::
+            This will typically produce a clause such as:
+
+            .. sourcecode:: sql
 
               mytable.related_id != <some id>
 
@@ -1744,8 +1757,6 @@ class RelationshipProperty(
         extracted_mapped_annotation: Optional[_AnnotationScanType],
         is_dataclass_field: bool,
     ) -> None:
-        argument = extracted_mapped_annotation
-
         if extracted_mapped_annotation is None:
             if self.argument is None:
                 self._raise_for_required(key, cls)
@@ -2898,9 +2909,6 @@ class JoinCondition:
     ) -> None:
         """Check the foreign key columns collected and emit error
         messages."""
-
-        can_sync = False
-
         foreign_cols = self._gather_columns_with_annotation(
             join_condition, "foreign"
         )

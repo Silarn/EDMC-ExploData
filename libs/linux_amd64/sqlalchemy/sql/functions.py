@@ -1,14 +1,11 @@
 # sql/functions.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
 # the MIT License: https://www.opensource.org/licenses/mit-license.php
 
-
-"""SQL function API, factories, and built-in functions.
-
-"""
+"""SQL function API, factories, and built-in functions."""
 
 from __future__ import annotations
 
@@ -140,7 +137,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
         ("clause_expr", InternalTraversal.dp_clauseelement),
         ("_with_ordinality", InternalTraversal.dp_boolean),
         ("_table_value_type", InternalTraversal.dp_has_cache_key),
-    ]
+    ] + Executable._executable_traverse_internals
 
     packagenames: Tuple[str, ...] = ()
 
@@ -155,7 +152,9 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
 
     clause_expr: Grouping[Any]
 
-    def __init__(self, *clauses: _ColumnExpressionOrLiteralArgument[Any]):
+    def __init__(
+        self, *clauses: _ColumnExpressionOrLiteralArgument[Any]
+    ) -> None:
         r"""Construct a :class:`.FunctionElement`.
 
         :param \*clauses: list of column expressions that form the arguments
@@ -246,9 +245,8 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
 
         .. sourcecode:: pycon+sql
 
-            >>> fn = (
-            ...     func.generate_series(1, 5).
-            ...     table_valued("value", "start", "stop", "step")
+            >>> fn = func.generate_series(1, 5).table_valued(
+            ...     "value", "start", "stop", "step"
             ... )
 
             >>> print(select(fn))
@@ -265,7 +263,9 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
 
         .. sourcecode:: pycon+sql
 
-            >>> fn = func.generate_series(4, 1, -1).table_valued("gen", with_ordinality="ordinality")
+            >>> fn = func.generate_series(4, 1, -1).table_valued(
+            ...     "gen", with_ordinality="ordinality"
+            ... )
             >>> print(select(fn))
             {printsql}SELECT anon_1.gen, anon_1.ordinality
             FROM generate_series(:generate_series_1, :generate_series_2, :generate_series_3) WITH ORDINALITY AS anon_1
@@ -377,7 +377,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
         .. sourcecode:: pycon+sql
 
             >>> from sqlalchemy import column, select, func
-            >>> stmt = select(column('x'), column('y')).select_from(func.myfunction())
+            >>> stmt = select(column("x"), column("y")).select_from(func.myfunction())
             >>> print(stmt)
             {printsql}SELECT x, y FROM myfunction()
 
@@ -434,6 +434,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
         order_by: Optional[_ByArgument] = None,
         rows: Optional[Tuple[Optional[int], Optional[int]]] = None,
         range_: Optional[Tuple[Optional[int], Optional[int]]] = None,
+        groups: Optional[Tuple[Optional[int], Optional[int]]] = None,
     ) -> Over[_T]:
         """Produce an OVER clause against this function.
 
@@ -442,12 +443,13 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
 
         The expression::
 
-            func.row_number().over(order_by='x')
+            func.row_number().over(order_by="x")
 
         is shorthand for::
 
             from sqlalchemy import over
-            over(func.row_number(), order_by='x')
+
+            over(func.row_number(), order_by="x")
 
         See :func:`_expression.over` for a full description.
 
@@ -464,6 +466,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
             order_by=order_by,
             rows=rows,
             range_=range_,
+            groups=groups,
         )
 
     def within_group(
@@ -511,6 +514,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
         is shorthand for::
 
             from sqlalchemy import funcfilter
+
             funcfilter(func.count(1), True)
 
         .. seealso::
@@ -567,7 +571,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
         An ORM example is as follows::
 
             class Venue(Base):
-                __tablename__ = 'venue'
+                __tablename__ = "venue"
                 id = Column(Integer, primary_key=True)
                 name = Column(String)
 
@@ -575,9 +579,10 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
                     "Venue",
                     primaryjoin=func.instr(
                         remote(foreign(name)), name + "/"
-                    ).as_comparison(1, 2) == 1,
+                    ).as_comparison(1, 2)
+                    == 1,
                     viewonly=True,
-                    order_by=name
+                    order_by=name,
                 )
 
         Above, the "Venue" class can load descendant "Venue" objects by
@@ -740,9 +745,7 @@ class FunctionElement(Executable, ColumnElement[_T], FromClause, Generative):
         # expressions against getitem.  This may need to be made
         # more portable if in the future we support other DBs
         # besides postgresql.
-        if against is operators.getitem and isinstance(
-            self.type, sqltypes.ARRAY
-        ):
+        if against in (operators.getitem, operators.json_getitem_op):
             return Grouping(self)
         else:
             return super().self_group(against=against)
@@ -775,7 +778,7 @@ class FunctionAsBinary(BinaryExpression[Any]):
 
     def __init__(
         self, fn: FunctionElement[Any], left_index: int, right_index: int
-    ):
+    ) -> None:
         self.sql_function = fn
         self.left_index = left_index
         self.right_index = right_index
@@ -784,7 +787,7 @@ class FunctionAsBinary(BinaryExpression[Any]):
         self.type = sqltypes.BOOLEANTYPE
         self.negate = None
         self._is_implicitly_boolean = True
-        self.modifiers = {}
+        self.modifiers = util.immutabledict({})
 
     @property
     def left_expr(self) -> ColumnElement[Any]:
@@ -827,7 +830,7 @@ class ScalarFunctionColumn(NamedColumn[_T]):
         fn: FunctionElement[_T],
         name: str,
         type_: Optional[_TypeEngineArgument[_T]] = None,
-    ):
+    ) -> None:
         self.fn = fn
         self.name = name
 
@@ -881,8 +884,11 @@ class _FunctionGenerator:
 
     .. sourcecode:: pycon+sql
 
-        >>> print(func.my_string(u'hi', type_=Unicode) + ' ' +
-        ...       func.my_string(u'there', type_=Unicode))
+        >>> print(
+        ...     func.my_string("hi", type_=Unicode)
+        ...     + " "
+        ...     + func.my_string("there", type_=Unicode)
+        ... )
         {printsql}my_string(:my_string_1) || :my_string_2 || my_string(:my_string_3)
 
     The object returned by a :data:`.func` call is usually an instance of
@@ -923,7 +929,7 @@ class _FunctionGenerator:
 
     """  # noqa
 
-    def __init__(self, **opts: Any):
+    def __init__(self, **opts: Any) -> None:
         self.__names: List[str] = []
         self.opts = opts
 
@@ -983,8 +989,41 @@ class _FunctionGenerator:
         @property
         def ansifunction(self) -> Type[AnsiFunction[Any]]: ...
 
-        @property
-        def array_agg(self) -> Type[array_agg[Any]]: ...
+        # set ColumnElement[_T] as a separate overload, to appease
+        # mypy which seems to not want to accept _T from
+        # _ColumnExpressionArgument. Seems somewhat related to the covariant
+        # _HasClauseElement as of mypy 1.15
+
+        @overload
+        def array_agg(
+            self,
+            col: ColumnElement[_T],
+            *args: _ColumnExpressionOrLiteralArgument[Any],
+            **kwargs: Any,
+        ) -> array_agg[_T]: ...
+
+        @overload
+        def array_agg(
+            self,
+            col: _ColumnExpressionArgument[_T],
+            *args: _ColumnExpressionOrLiteralArgument[Any],
+            **kwargs: Any,
+        ) -> array_agg[_T]: ...
+
+        @overload
+        def array_agg(
+            self,
+            col: _T,
+            *args: _ColumnExpressionOrLiteralArgument[Any],
+            **kwargs: Any,
+        ) -> array_agg[_T]: ...
+
+        def array_agg(
+            self,
+            col: _ColumnExpressionOrLiteralArgument[_T],
+            *args: _ColumnExpressionOrLiteralArgument[Any],
+            **kwargs: Any,
+        ) -> array_agg[_T]: ...
 
         @property
         def cast(self) -> Type[Cast[Any]]: ...
@@ -992,10 +1031,10 @@ class _FunctionGenerator:
         @property
         def char_length(self) -> Type[char_length]: ...
 
-        # set ColumnElement[_T] as a separate overload, to appease mypy
-        # which seems to not want to accept _T from _ColumnExpressionArgument.
-        # this is even if all non-generic types are removed from it, so
-        # reasons remain unclear for why this does not work
+        # set ColumnElement[_T] as a separate overload, to appease
+        # mypy which seems to not want to accept _T from
+        # _ColumnExpressionArgument. Seems somewhat related to the covariant
+        # _HasClauseElement as of mypy 1.15
 
         @overload
         def coalesce(
@@ -1016,7 +1055,7 @@ class _FunctionGenerator:
         @overload
         def coalesce(
             self,
-            col: _ColumnExpressionOrLiteralArgument[_T],
+            col: _T,
             *args: _ColumnExpressionOrLiteralArgument[Any],
             **kwargs: Any,
         ) -> coalesce[_T]: ...
@@ -1067,10 +1106,10 @@ class _FunctionGenerator:
         @property
         def localtimestamp(self) -> Type[localtimestamp]: ...
 
-        # set ColumnElement[_T] as a separate overload, to appease mypy
-        # which seems to not want to accept _T from _ColumnExpressionArgument.
-        # this is even if all non-generic types are removed from it, so
-        # reasons remain unclear for why this does not work
+        # set ColumnElement[_T] as a separate overload, to appease
+        # mypy which seems to not want to accept _T from
+        # _ColumnExpressionArgument. Seems somewhat related to the covariant
+        # _HasClauseElement as of mypy 1.15
 
         @overload
         def max(  # noqa: A001
@@ -1091,7 +1130,7 @@ class _FunctionGenerator:
         @overload
         def max(  # noqa: A001
             self,
-            col: _ColumnExpressionOrLiteralArgument[_T],
+            col: _T,
             *args: _ColumnExpressionOrLiteralArgument[Any],
             **kwargs: Any,
         ) -> max[_T]: ...
@@ -1103,10 +1142,10 @@ class _FunctionGenerator:
             **kwargs: Any,
         ) -> max[_T]: ...
 
-        # set ColumnElement[_T] as a separate overload, to appease mypy
-        # which seems to not want to accept _T from _ColumnExpressionArgument.
-        # this is even if all non-generic types are removed from it, so
-        # reasons remain unclear for why this does not work
+        # set ColumnElement[_T] as a separate overload, to appease
+        # mypy which seems to not want to accept _T from
+        # _ColumnExpressionArgument. Seems somewhat related to the covariant
+        # _HasClauseElement as of mypy 1.15
 
         @overload
         def min(  # noqa: A001
@@ -1127,7 +1166,7 @@ class _FunctionGenerator:
         @overload
         def min(  # noqa: A001
             self,
-            col: _ColumnExpressionOrLiteralArgument[_T],
+            col: _T,
             *args: _ColumnExpressionOrLiteralArgument[Any],
             **kwargs: Any,
         ) -> min[_T]: ...
@@ -1172,10 +1211,10 @@ class _FunctionGenerator:
         @property
         def session_user(self) -> Type[session_user]: ...
 
-        # set ColumnElement[_T] as a separate overload, to appease mypy
-        # which seems to not want to accept _T from _ColumnExpressionArgument.
-        # this is even if all non-generic types are removed from it, so
-        # reasons remain unclear for why this does not work
+        # set ColumnElement[_T] as a separate overload, to appease
+        # mypy which seems to not want to accept _T from
+        # _ColumnExpressionArgument. Seems somewhat related to the covariant
+        # _HasClauseElement as of mypy 1.15
 
         @overload
         def sum(  # noqa: A001
@@ -1196,7 +1235,7 @@ class _FunctionGenerator:
         @overload
         def sum(  # noqa: A001
             self,
-            col: _ColumnExpressionOrLiteralArgument[_T],
+            col: _T,
             *args: _ColumnExpressionOrLiteralArgument[Any],
             **kwargs: Any,
         ) -> sum[_T]: ...
@@ -1292,7 +1331,7 @@ class Function(FunctionElement[_T]):
         *clauses: _ColumnExpressionOrLiteralArgument[_T],
         type_: None = ...,
         packagenames: Optional[Tuple[str, ...]] = ...,
-    ): ...
+    ) -> None: ...
 
     @overload
     def __init__(
@@ -1301,7 +1340,7 @@ class Function(FunctionElement[_T]):
         *clauses: _ColumnExpressionOrLiteralArgument[Any],
         type_: _TypeEngineArgument[_T] = ...,
         packagenames: Optional[Tuple[str, ...]] = ...,
-    ): ...
+    ) -> None: ...
 
     def __init__(
         self,
@@ -1309,7 +1348,7 @@ class Function(FunctionElement[_T]):
         *clauses: _ColumnExpressionOrLiteralArgument[Any],
         type_: Optional[_TypeEngineArgument[_T]] = None,
         packagenames: Optional[Tuple[str, ...]] = None,
-    ):
+    ) -> None:
         """Construct a :class:`.Function`.
 
         The :data:`.func` construct is normally used to construct
@@ -1367,9 +1406,11 @@ class GenericFunction(Function[_T]):
         from sqlalchemy.sql.functions import GenericFunction
         from sqlalchemy.types import DateTime
 
+
         class as_utc(GenericFunction):
             type = DateTime()
             inherit_cache = True
+
 
         print(select(func.as_utc()))
 
@@ -1417,6 +1458,7 @@ class GenericFunction(Function[_T]):
     construct::
 
         from sqlalchemy.sql import quoted_name
+
 
         class GeoBuffer(GenericFunction):
             type = Geometry()
@@ -1488,7 +1530,7 @@ class GenericFunction(Function[_T]):
 
     def __init__(
         self, *args: _ColumnExpressionOrLiteralArgument[Any], **kwargs: Any
-    ):
+    ) -> None:
         parsed_args = kwargs.pop("_parsed_args", None)
         if parsed_args is None:
             parsed_args = [
@@ -1535,7 +1577,7 @@ class next_value(GenericFunction[int]):
         ("sequence", InternalTraversal.dp_named_ddl_element)
     ]
 
-    def __init__(self, seq: schema.Sequence, **kw: Any):
+    def __init__(self, seq: schema.Sequence, **kw: Any) -> None:
         assert isinstance(
             seq, schema.Sequence
         ), "next_value() accepts a Sequence object as input."
@@ -1560,19 +1602,23 @@ class AnsiFunction(GenericFunction[_T]):
 
     inherit_cache = True
 
-    def __init__(self, *args: _ColumnExpressionArgument[Any], **kwargs: Any):
+    def __init__(
+        self, *args: _ColumnExpressionArgument[Any], **kwargs: Any
+    ) -> None:
         GenericFunction.__init__(self, *args, **kwargs)
 
 
 class ReturnTypeFromArgs(GenericFunction[_T]):
-    """Define a function whose return type is the same as its arguments."""
+    """Define a function whose return type is bound to the type of its
+    arguments.
+    """
 
     inherit_cache = True
 
-    # set ColumnElement[_T] as a separate overload, to appease mypy which seems
-    # to not want to accept _T from _ColumnExpressionArgument.  this is even if
-    # all non-generic types are removed from it, so reasons remain unclear for
-    # why this does not work
+    # set ColumnElement[_T] as a separate overload, to appease
+    # mypy which seems to not want to accept _T from
+    # _ColumnExpressionArgument. Seems somewhat related to the covariant
+    # _HasClauseElement as of mypy 1.15
 
     @overload
     def __init__(
@@ -1580,7 +1626,7 @@ class ReturnTypeFromArgs(GenericFunction[_T]):
         col: ColumnElement[_T],
         *args: _ColumnExpressionOrLiteralArgument[Any],
         **kwargs: Any,
-    ): ...
+    ) -> None: ...
 
     @overload
     def __init__(
@@ -1588,19 +1634,19 @@ class ReturnTypeFromArgs(GenericFunction[_T]):
         col: _ColumnExpressionArgument[_T],
         *args: _ColumnExpressionOrLiteralArgument[Any],
         **kwargs: Any,
-    ): ...
+    ) -> None: ...
 
     @overload
     def __init__(
         self,
-        col: _ColumnExpressionOrLiteralArgument[_T],
+        col: _T,
         *args: _ColumnExpressionOrLiteralArgument[Any],
         **kwargs: Any,
-    ): ...
+    ) -> None: ...
 
     def __init__(
-        self, *args: _ColumnExpressionOrLiteralArgument[Any], **kwargs: Any
-    ):
+        self, *args: _ColumnExpressionOrLiteralArgument[_T], **kwargs: Any
+    ) -> None:
         fn_args: Sequence[ColumnElement[Any]] = [
             coercions.expect(
                 roles.ExpressionElementRole,
@@ -1657,7 +1703,7 @@ class concat(GenericFunction[str]):
 
     .. sourcecode:: pycon+sql
 
-        >>> print(select(func.concat('a', 'b')))
+        >>> print(select(func.concat("a", "b")))
         {printsql}SELECT concat(:concat_2, :concat_3) AS concat_1
 
     String concatenation in SQLAlchemy is more commonly available using the
@@ -1682,7 +1728,7 @@ class char_length(GenericFunction[int]):
     type = sqltypes.Integer()
     inherit_cache = True
 
-    def __init__(self, arg: _ColumnExpressionArgument[str], **kw: Any):
+    def __init__(self, arg: _ColumnExpressionArgument[str], **kw: Any) -> None:
         # slight hack to limit to just one positional argument
         # not sure why this one function has this special treatment
         super().__init__(arg, **kw)
@@ -1705,11 +1751,13 @@ class count(GenericFunction[int]):
         from sqlalchemy import select
         from sqlalchemy import table, column
 
-        my_table = table('some_table', column('id'))
+        my_table = table("some_table", column("id"))
 
         stmt = select(func.count()).select_from(my_table)
 
-    Executing ``stmt`` would emit::
+    Executing ``stmt`` would emit:
+
+    .. sourcecode:: sql
 
         SELECT count(*) AS count_1
         FROM some_table
@@ -1726,7 +1774,7 @@ class count(GenericFunction[int]):
             _ColumnExpressionArgument[Any], _StarOrOne, None
         ] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         if expression is None:
             expression = literal_column("*")
         super().__init__(expression, **kwargs)
@@ -1795,7 +1843,7 @@ class user(AnsiFunction[str]):
     inherit_cache = True
 
 
-class array_agg(GenericFunction[_T]):
+class array_agg(ReturnTypeFromArgs[Sequence[_T]]):
     """Support for the ARRAY_AGG function.
 
     The ``func.array_agg(expr)`` construct returns an expression of
@@ -1815,7 +1863,9 @@ class array_agg(GenericFunction[_T]):
 
     inherit_cache = True
 
-    def __init__(self, *args: _ColumnExpressionArgument[Any], **kwargs: Any):
+    def __init__(
+        self, *args: _ColumnExpressionArgument[Any], **kwargs: Any
+    ) -> None:
         fn_args: Sequence[ColumnElement[Any]] = [
             coercions.expect(
                 roles.ExpressionElementRole, c, apply_propagate_attrs=self
@@ -2009,9 +2059,7 @@ class grouping_sets(GenericFunction[_T]):
         from sqlalchemy import tuple_
 
         stmt = select(
-            func.sum(table.c.value),
-            table.c.col_1, table.c.col_2,
-            table.c.col_3
+            func.sum(table.c.value), table.c.col_1, table.c.col_2, table.c.col_3
         ).group_by(
             func.grouping_sets(
                 tuple_(table.c.col_1, table.c.col_2),
@@ -2019,10 +2067,9 @@ class grouping_sets(GenericFunction[_T]):
             )
         )
 
-
     .. versionadded:: 1.2
 
-    """
+    """  # noqa: E501
 
     _has_args = True
     inherit_cache = True
@@ -2051,5 +2098,7 @@ class aggregate_strings(GenericFunction[str]):
     _has_args = True
     inherit_cache = True
 
-    def __init__(self, clause: _ColumnExpressionArgument[Any], separator: str):
+    def __init__(
+        self, clause: _ColumnExpressionArgument[Any], separator: str
+    ) -> None:
         super().__init__(clause, separator)

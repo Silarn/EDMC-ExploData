@@ -158,4 +158,7 @@ data: dict[str, set[str]] = {
         '$Codex_Ent_Tussocks_14_Name;',
         '$Codex_Ent_Tussocks_15_Name;'
     },
+    '$Codex_Ent_Ingensradices_Genus_Name;': {
+        '$Codex_Ent_Ingensradices_Unicus_Name;',
+    }
 }

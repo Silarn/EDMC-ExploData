@@ -532,7 +532,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Teal',
                         'Y': 'Lime',
                         'TTS': 'Sage',
-                        'L': 'Ochre',
+                        'L': 'Ocher',
                         'AeBe': 'Grey',
                         'D': 'Yellow',
                         'N': 'Emerald'
@@ -634,8 +634,7 @@ data: Mapping[str, Mapping[str, any]] = {
                     'star': {
                         'B': 'Emerald',
                         'A': 'Emerald',
-                        'N': 'Emerald',
-                        'T': 'Emerald'
+                        'N': 'Emerald'
                     }
                 },
                 '$Codex_Ent_Stratum_05_Name;': {
@@ -750,4 +749,5 @@ data: Mapping[str, Mapping[str, any]] = {
         }
     },
     '$Codex_Ent_Vents_Name;': {'name': 'Amphora Plant', 'distance': 100, 'multiple': False},
+    "$Codex_Ent_Ingensradices_Genus_Name;": {'name': 'Radicoida', 'distance': 15, 'multiple': False},
 }

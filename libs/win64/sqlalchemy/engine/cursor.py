@@ -1,5 +1,5 @@
 # engine/cursor.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -20,6 +20,7 @@ from typing import Any
 from typing import cast
 from typing import ClassVar
 from typing import Dict
+from typing import Iterable
 from typing import Iterator
 from typing import List
 from typing import Mapping
@@ -1162,7 +1163,7 @@ class BufferedRowCursorFetchStrategy(CursorFetchStrategy):
 
             result = conn.execution_options(
                 stream_results=True, max_row_buffer=50
-                ).execute(text("select * from table"))
+            ).execute(text("select * from table"))
 
     .. versionadded:: 1.4 ``max_row_buffer`` may now exceed 1000 rows.
 
@@ -1289,12 +1290,16 @@ class FullyBufferedCursorFetchStrategy(CursorFetchStrategy):
     __slots__ = ("_rowbuffer", "alternate_cursor_description")
 
     def __init__(
-        self, dbapi_cursor, alternate_description=None, initial_buffer=None
+        self,
+        dbapi_cursor: Optional[DBAPICursor],
+        alternate_description: Optional[_DBAPICursorDescription] = None,
+        initial_buffer: Optional[Iterable[Any]] = None,
     ):
         self.alternate_cursor_description = alternate_description
         if initial_buffer is not None:
             self._rowbuffer = collections.deque(initial_buffer)
         else:
+            assert dbapi_cursor is not None
             self._rowbuffer = collections.deque(dbapi_cursor.fetchall())
 
     def yield_per(self, result, dbapi_cursor, num):
@@ -1353,15 +1358,15 @@ class _NoResultMetaData(ResultMetaData):
         self._we_dont_return_rows()
 
     @property
-    def _keymap(self):
+    def _keymap(self):  # type: ignore[override]
         self._we_dont_return_rows()
 
     @property
-    def _key_to_index(self):
+    def _key_to_index(self):  # type: ignore[override]
         self._we_dont_return_rows()
 
     @property
-    def _processors(self):
+    def _processors(self):  # type: ignore[override]
         self._we_dont_return_rows()
 
     @property
@@ -1756,11 +1761,9 @@ class CursorResult(Result[_T]):
 
             r1 = connection.execute(
                 users.insert().returning(
-                    users.c.user_name,
-                    users.c.user_id,
-                    sort_by_parameter_order=True
+                    users.c.user_name, users.c.user_id, sort_by_parameter_order=True
                 ),
-                user_values
+                user_values,
             )
 
             r2 = connection.execute(
@@ -1768,19 +1771,16 @@ class CursorResult(Result[_T]):
                     addresses.c.address_id,
                     addresses.c.address,
                     addresses.c.user_id,
-                    sort_by_parameter_order=True
+                    sort_by_parameter_order=True,
                 ),
-                address_values
+                address_values,
             )
 
             rows = r1.splice_horizontally(r2).all()
-            assert (
-                rows ==
-                [
-                    ("john", 1, 1, "foo@bar.com", 1),
-                    ("jack", 2, 2, "bar@bat.com", 2),
-                ]
-            )
+            assert rows == [
+                ("john", 1, 1, "foo@bar.com", 1),
+                ("jack", 2, 2, "bar@bat.com", 2),
+            ]
 
         .. versionadded:: 2.0
 
@@ -1789,7 +1789,7 @@ class CursorResult(Result[_T]):
             :meth:`.CursorResult.splice_vertically`
 
 
-        """
+        """  # noqa: E501
 
         clone = self._generate()
         total_rows = [

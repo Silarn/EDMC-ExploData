@@ -1,5 +1,5 @@
 # orm/mapper.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -329,7 +329,7 @@ class Mapper(
 
                 class User(Base):
                     __table__ = user_table
-                    __mapper_args__ = {'column_prefix':'_'}
+                    __mapper_args__ = {"column_prefix": "_"}
 
            The above mapping will assign the ``user_id``, ``user_name``, and
            ``password`` columns to attributes named ``_user_id``,
@@ -545,14 +545,14 @@ class Mapper(
           base-most mapped :class:`.Table`::
 
             class Employee(Base):
-                __tablename__ = 'employee'
+                __tablename__ = "employee"
 
                 id: Mapped[int] = mapped_column(primary_key=True)
                 discriminator: Mapped[str] = mapped_column(String(50))
 
                 __mapper_args__ = {
-                    "polymorphic_on":discriminator,
-                    "polymorphic_identity":"employee"
+                    "polymorphic_on": discriminator,
+                    "polymorphic_identity": "employee",
                 }
 
           It may also be specified
@@ -561,17 +561,18 @@ class Mapper(
           approach::
 
             class Employee(Base):
-                __tablename__ = 'employee'
+                __tablename__ = "employee"
 
                 id: Mapped[int] = mapped_column(primary_key=True)
                 discriminator: Mapped[str] = mapped_column(String(50))
 
                 __mapper_args__ = {
-                    "polymorphic_on":case(
+                    "polymorphic_on": case(
                         (discriminator == "EN", "engineer"),
                         (discriminator == "MA", "manager"),
-                        else_="employee"),
-                    "polymorphic_identity":"employee"
+                        else_="employee",
+                    ),
+                    "polymorphic_identity": "employee",
                 }
 
           It may also refer to any attribute using its string name,
@@ -579,14 +580,14 @@ class Mapper(
           configurations::
 
                 class Employee(Base):
-                    __tablename__ = 'employee'
+                    __tablename__ = "employee"
 
                     id: Mapped[int] = mapped_column(primary_key=True)
                     discriminator: Mapped[str]
 
                     __mapper_args__ = {
                         "polymorphic_on": "discriminator",
-                        "polymorphic_identity": "employee"
+                        "polymorphic_identity": "employee",
                     }
 
           When setting ``polymorphic_on`` to reference an
@@ -602,6 +603,7 @@ class Mapper(
 
                 from sqlalchemy import event
                 from sqlalchemy.orm import object_mapper
+
 
                 @event.listens_for(Employee, "init", propagate=True)
                 def set_identity(instance, *arg, **kw):
@@ -1054,7 +1056,7 @@ class Mapper(
 
     """
 
-    primary_key: Tuple[Column[Any], ...]
+    primary_key: Tuple[ColumnElement[Any], ...]
     """An iterable containing the collection of :class:`_schema.Column`
     objects
     which comprise the 'primary key' of the mapped table, from the
@@ -2552,7 +2554,7 @@ class Mapper(
         if spec == "*":
             mappers = list(self.self_and_descendants)
         elif spec:
-            mapper_set = set()
+            mapper_set: Set[Mapper[Any]] = set()
             for m in util.to_list(spec):
                 m = _class_to_mapper(m)
                 if not m.isa(self):
@@ -3259,14 +3261,9 @@ class Mapper(
         The resulting structure is a dictionary of columns mapped
         to lists of equivalent columns, e.g.::
 
-            {
-                tablea.col1:
-                    {tableb.col1, tablec.col1},
-                tablea.col2:
-                    {tabled.col2}
-            }
+            {tablea.col1: {tableb.col1, tablec.col1}, tablea.col2: {tabled.col2}}
 
-        """
+        """  # noqa: E501
         result: _EquivalentColumnMap = {}
 
         def visit_binary(binary):
@@ -3431,9 +3428,11 @@ class Mapper(
         return self.class_manager.mapper.base_mapper
 
     def _result_has_identity_key(self, result, adapter=None):
-        pk_cols: Sequence[ColumnClause[Any]] = self.primary_key
-        if adapter:
-            pk_cols = [adapter.columns[c] for c in pk_cols]
+        pk_cols: Sequence[ColumnElement[Any]]
+        if adapter is not None:
+            pk_cols = [adapter.columns[c] for c in self.primary_key]
+        else:
+            pk_cols = self.primary_key
         rk = result.keys()
         for col in pk_cols:
             if col not in rk:
@@ -3443,7 +3442,7 @@ class Mapper(
 
     def identity_key_from_row(
         self,
-        row: Optional[Union[Row[Any], RowMapping]],
+        row: Union[Row[Any], RowMapping],
         identity_token: Optional[Any] = None,
         adapter: Optional[ORMAdapter] = None,
     ) -> _IdentityKeyType[_O]:
@@ -3458,18 +3457,21 @@ class Mapper(
             for the "row" argument
 
         """
-        pk_cols: Sequence[ColumnClause[Any]] = self.primary_key
-        if adapter:
-            pk_cols = [adapter.columns[c] for c in pk_cols]
-
-        if hasattr(row, "_mapping"):
-            mapping = row._mapping  # type: ignore
+        pk_cols: Sequence[ColumnElement[Any]]
+        if adapter is not None:
+            pk_cols = [adapter.columns[c] for c in self.primary_key]
         else:
-            mapping = cast("Mapping[Any, Any]", row)
+            pk_cols = self.primary_key
+
+        mapping: RowMapping
+        if hasattr(row, "_mapping"):
+            mapping = row._mapping
+        else:
+            mapping = row  # type: ignore[assignment]
 
         return (
             self._identity_class,
-            tuple(mapping[column] for column in pk_cols),  # type: ignore
+            tuple(mapping[column] for column in pk_cols),
             identity_token,
         )
 
@@ -3739,14 +3741,15 @@ class Mapper(
 
         given::
 
-            class A:
-                ...
+            class A: ...
+
 
             class B(A):
                 __mapper_args__ = {"polymorphic_load": "selectin"}
 
-            class C(B):
-                ...
+
+            class C(B): ...
+
 
             class D(B):
                 __mapper_args__ = {"polymorphic_load": "selectin"}
@@ -4305,7 +4308,7 @@ def _dispose_registries(registries: Set[_RegistryType], cascade: bool) -> None:
         reg._new_mappers = False
 
 
-def reconstructor(fn):
+def reconstructor(fn: _Fn) -> _Fn:
     """Decorate a method as the 'reconstructor' hook.
 
     Designates a single method as the "reconstructor", an ``__init__``-like
@@ -4331,7 +4334,7 @@ def reconstructor(fn):
         :meth:`.InstanceEvents.load`
 
     """
-    fn.__sa_reconstructor__ = True
+    fn.__sa_reconstructor__ = True  # type: ignore[attr-defined]
     return fn
 
 

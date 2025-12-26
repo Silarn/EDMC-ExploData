@@ -1,5 +1,5 @@
 # sql/coercions.py
-# Copyright (C) 2005-2024 the SQLAlchemy authors and contributors
+# Copyright (C) 2005-2025 the SQLAlchemy authors and contributors
 # <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
@@ -57,9 +57,9 @@ if typing.TYPE_CHECKING:
     from .elements import ClauseElement
     from .elements import ColumnClause
     from .elements import ColumnElement
-    from .elements import DQLDMLClauseElement
     from .elements import NamedColumn
     from .elements import SQLCoreOperations
+    from .elements import TextClause
     from .schema import Column
     from .selectable import _ColumnsClauseElement
     from .selectable import _JoinTargetProtocol
@@ -75,7 +75,7 @@ _StringOnlyR = TypeVar("_StringOnlyR", bound=roles.StringRole)
 _T = TypeVar("_T", bound=Any)
 
 
-def _is_literal(element):
+def _is_literal(element: Any) -> bool:
     """Return whether or not the element is a "literal" in the context
     of a SQL expression construct.
 
@@ -190,7 +190,7 @@ def expect(
     role: Type[roles.DDLReferredColumnRole],
     element: Any,
     **kw: Any,
-) -> Column[Any]: ...
+) -> Union[Column[Any], str]: ...
 
 
 @overload
@@ -206,7 +206,7 @@ def expect(
     role: Type[roles.StatementOptionRole],
     element: Any,
     **kw: Any,
-) -> DQLDMLClauseElement: ...
+) -> Union[ColumnElement[Any], TextClause]: ...
 
 
 @overload
@@ -843,24 +843,22 @@ class InElementImpl(RoleImpl):
         )
 
     @util.preload_module("sqlalchemy.sql.elements")
-    def _literal_coercion(self, element, *, expr, operator, **kw):
+    def _literal_coercion(self, element, *, expr, operator, **kw):  # type: ignore[override] # noqa: E501
         if util.is_non_string_iterable(element):
             non_literal_expressions: Dict[
-                Optional[ColumnElement[Any]],
-                ColumnElement[Any],
+                Optional[_ColumnExpressionArgument[Any]],
+                _ColumnExpressionArgument[Any],
             ] = {}
             element = list(element)
             for o in element:
                 if not _is_literal(o):
                     if not isinstance(
                         o, util.preloaded.sql_elements.ColumnElement
-                    ):
+                    ) and not hasattr(o, "__clause_element__"):
                         self._raise_for_expected(element, **kw)
 
                     else:
                         non_literal_expressions[o] = o
-                elif o is None:
-                    non_literal_expressions[o] = elements.Null()
 
             if non_literal_expressions:
                 return elements.ClauseList(
