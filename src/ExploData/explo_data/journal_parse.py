@@ -28,7 +28,8 @@ from .RegionMap import findRegion
 
 from ExploData.explo_data import const
 from .bio_data.codex import parse_variant, set_codex
-from .db import System, Commander, Planet, JournalLog, get_session, SystemStatus, PlanetStatus
+from .db import (System, Commander, Planet, JournalLog, get_session, SystemStatus, PlanetStatus, Death, Resurrection,
+                 ExoBioSale, SystemSale)
 from .body_data.struct import PlanetData, StarData, NonBodyData
 
 JOURNAL_REGEX = re.compile(r'^Journal(Alpha|Beta)?\.[0-9]{2,4}-?[0-9]{2}-?[0-9]{2}T?[0-9]{2}[0-9]{2}[0-9]{2}'
@@ -68,6 +69,7 @@ class JournalParse:
         self._session: Session = session
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
+        self._in_ship: bool = False
 
     def parse_journal(self, journal: Path, event: Event) -> int:
         """
@@ -135,6 +137,7 @@ class JournalParse:
         :param entry: JSON object of the current journal line
         """
         event_type = entry['event'].lower()
+        timestamp: datetime = datetime.fromisoformat(entry['timestamp'])
         match event_type:
             case 'loadgame':
                 self._session.close()
@@ -145,6 +148,7 @@ class JournalParse:
             case 'location' | 'fsdjump' | 'carrierjump':
                 self._session.close()
                 self.set_system(entry['StarSystem'], entry.get('StarPos', None))
+                self._in_ship = True if not entry.get('InSRV', False) and not entry.get('OnFoot', False) else False
             case 'scan':
                 if not self._system:
                     return
@@ -158,8 +162,9 @@ class JournalParse:
                     non_body = NonBodyData.from_journal(self._system, self.get_body_name(entry['BodyName']),
                                                         entry['BodyID'], self._session)
                     if self._cmdr:
-                        non_body.set_discovered(True, self._cmdr.id).set_was_discovered(entry['WasDiscovered'],
-                                                                                        self._cmdr.id)
+                        non_body.set_discovered(True, self._cmdr.id) \
+                            .set_was_discovered(entry['WasDiscovered'], self._cmdr.id) \
+                            .set_scanned_at(timestamp, self._cmdr.id)
 
             case 'fssdiscoveryscan':
                 if not self._system or not self._cmdr:
@@ -200,8 +205,9 @@ class JournalParse:
                                                                entry['BodyID'], self._session)
                 target = int(entry['EfficiencyTarget'])
                 used = int(entry['ProbesUsed'])
-                body.set_mapped(True, self._cmdr.id)\
-                    .set_efficient(target >= used, self._cmdr.id)
+                body.set_mapped(True, self._cmdr.id) \
+                    .set_efficient(target >= used, self._cmdr.id) \
+                    .set_mapped_at(timestamp, self._cmdr.id)
                 if self.get_system_status().fully_scanned:
                     count = 0
                     for planet in self._system.planets:
@@ -241,6 +247,7 @@ class JournalParse:
                         set_codex(self._cmdr.id, entry['Name'], self._system.region)
             case 'disembark':
                 if entry.get('OnPlanet', False):
+                    self._in_ship = False
                     if not self._system or not self._cmdr:
                         return
                     self._system = self._session.merge(self._system)
@@ -255,6 +262,86 @@ class JournalParse:
 
                     if self._cmdr:
                         target_body.set_footfall(True, self._cmdr.id)
+            case 'embark':
+                if not entry.get('SRV', False) and not entry.get('Taxi', False):
+                    self._in_ship = True
+            case 'docksrv':
+                self._in_ship = True
+            case 'launchsrv':
+                self._in_ship = False
+            case 'died':
+                if not self._cmdr:
+                    return
+                self._cmdr = self._session.merge(self._cmdr)
+                death: Death = self._session.scalar(select(Death).where(Death.commander_id == self._cmdr.id)
+                                                    .where(Death.died_at == timestamp))
+
+                if not death:
+                    death = Death(commander_id=self._cmdr.id, died_at=timestamp)
+                    self._session.add(death)
+
+                death.in_ship = self._in_ship
+
+                self._session.commit()
+            case 'resurrect':
+                if not self._cmdr:
+                    return
+                self._cmdr = self._session.merge(self._cmdr)
+                resurrection: Resurrection = self._session.scalar(select(Resurrection)
+                                                                  .where(Resurrection.commander_id == self._cmdr.id)
+                                                                  .where(Resurrection.resurrected_at == timestamp))
+
+                if not resurrection:
+                    resurrection = Resurrection(commander_id=self._cmdr.id, resurrected_at=timestamp)
+                    self._session.add(resurrection)
+
+                resurrection.type = entry['Option']
+
+                self._session.commit()
+            case 'sellexplorationdata':
+                if not self._cmdr:
+                    return
+                self._cmdr = self._session.merge(self._cmdr)
+                systems: list[str] = entry['Systems']
+                system_sale: SystemSale = self._session.scalar(select(SystemSale).where(SystemSale.commander_id == self._cmdr.id)
+                                                               .where(SystemSale.sold_at == timestamp))
+
+                if not system_sale:
+                    system_sale = SystemSale(commander_id=self._cmdr.id, sold_at=timestamp)
+                    self._session.add(system_sale)
+
+                system_sale.systems = '|'.join(systems)
+
+                self._session.commit()
+            case 'multisellexplorationdata':
+                if not self._cmdr:
+                    return
+                self._cmdr = self._session.merge(self._cmdr)
+                systems: list[str] = []
+                for system_data in entry['Discovered']:
+                    systems.append(system_data['SystemName'])
+                system_sale: SystemSale = self._session.scalar(select(SystemSale).where(SystemSale.commander_id == self._cmdr.id)
+                                                               .where(SystemSale.sold_at == timestamp))
+
+                if not system_sale:
+                    system_sale = SystemSale(commander_id=self._cmdr.id, sold_at=timestamp)
+                    self._session.add(system_sale)
+
+                system_sale.systems = '|'.join(systems)
+
+                self._session.commit()
+            case 'sellorganicdata':
+                if not self._cmdr:
+                    return
+                self._cmdr = self._session.merge(self._cmdr)
+                exobio_sale: ExoBioSale = self._session.scalar(select(ExoBioSale).where(ExoBioSale.commander_id == self._cmdr.id)
+                                                               .where(ExoBioSale.sold_at == timestamp))
+
+                if not exobio_sale:
+                    exobio_sale = ExoBioSale(commander_id=self._cmdr.id, sold_at=timestamp)
+                    self._session.add(exobio_sale)
+                    self._session.commit()
+
 
     def get_body_name(self, fullname: str) -> str:
         """
@@ -338,6 +425,7 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with star data)
         """
 
+        timestamp: datetime = datetime.fromisoformat(entry['timestamp'])
         scan_type = get_scan_type(entry.get('ScanType', parse_old_scan_type(entry)))
         body_short_name = self.get_body_name(entry['BodyName'])
         star_data = StarData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
@@ -348,7 +436,8 @@ class JournalParse:
         if self._cmdr:
             star_data.set_discovered(True, self._cmdr.id) \
                 .set_was_discovered(entry.get('WasDiscovered', False), self._cmdr.id) \
-                .set_scan_state(scan_type, self._cmdr.id)
+                .set_scan_state(scan_type, self._cmdr.id) \
+                .set_scanned_at(timestamp, self._cmdr.id)
 
         if 'Rings' in entry:
             for ring in entry['Rings']:
@@ -362,6 +451,7 @@ class JournalParse:
         :param entry: The journal event dict (must be a Scan event with planet data)
         """
 
+        timestamp: datetime = datetime.fromisoformat(entry['timestamp'])
         scan_type = get_scan_type(entry.get('ScanType', parse_old_scan_type(entry)))
         body_short_name = self.get_body_name(entry['BodyName'])
         body_data = PlanetData.from_journal(self._system, body_short_name, entry['BodyID'], self._session)
@@ -377,7 +467,8 @@ class JournalParse:
                 .set_was_discovered(entry.get('WasDiscovered', False), self._cmdr.id) \
                 .set_was_mapped(entry.get('WasMapped', False), self._cmdr.id) \
                 .set_was_footfalled(entry.get('WasFootfalled', None), self._cmdr.id) \
-                .set_scan_state(scan_type, self._cmdr.id)
+                .set_scan_state(scan_type, self._cmdr.id) \
+                .set_scanned_at(timestamp, self._cmdr.id)
 
         star_search = re.search('^([A-Z]+) .+$', body_short_name)
         if star_search:
@@ -435,6 +526,7 @@ class JournalParse:
 
         :param entry: The journal event dict. Must be a ScanOrganic event.
         """
+        timestamp: datetime = datetime.fromisoformat(entry['timestamp'])
         planet = self._session.scalar(select(Planet).where(Planet.system_id == self._system.id)
                                       .where(Planet.body_id == entry['Body']))
         if not planet:
@@ -453,7 +545,7 @@ class JournalParse:
 
         if scan_level == 3 and self._cmdr:
             target_body.set_flora_species_scan(
-                entry['Genus'], entry['Species'], entry.get('WasLogged', None), scan_level, self._cmdr.id
+                entry['Genus'], entry['Species'], entry.get('WasLogged', None), scan_level, timestamp, self._cmdr.id
             )
 
         if 'Variant' in entry:

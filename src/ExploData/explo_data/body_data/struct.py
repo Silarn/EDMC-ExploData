@@ -2,7 +2,7 @@
 # ExploData module plugin for EDMC
 # Source: https://github.com/Silarn/EDMC-ExploData
 # Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
-
+from datetime import datetime
 from typing import Self, Optional
 
 from sqlalchemy.orm import Session
@@ -220,7 +220,7 @@ class PlanetData:
         self.commit()
         return self
 
-    def set_flora_species_scan(self, genus: str, species: str, was_logged: Optional[bool], scan: int, commander: int) -> Self:
+    def set_flora_species_scan(self, genus: str, species: str, was_logged: Optional[bool], scan: int, timestamp: datetime, commander: int) -> Self:
         flora = self.get_flora(genus, species, create=True)[0]
         flora.species = species
         stmt = select(FloraScans).where(FloraScans.flora_id == flora.id).where(FloraScans.commander_id == commander)
@@ -230,6 +230,7 @@ class PlanetData:
             self._session.add(scan_data)
             self.commit()
         scan_data.count = scan
+        scan_data.scanned_at = timestamp
         if scan == 3:
             stmt = delete(Waypoint).where(Waypoint.commander_id == commander).where(Waypoint.flora_id == flora.id)
             self._session.execute(stmt)
@@ -358,6 +359,16 @@ class PlanetData:
         self.commit()
         return self
 
+    def scanned_at(self, commander_id: int) -> datetime | None:
+        status = self.get_status(commander_id)
+        return status.scanned_at
+
+    def set_scanned_at(self, value: datetime | None, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.scanned_at = value
+        self.commit()
+        return self
+
     def was_discovered(self, commander_id: int) -> bool:
         status = self.get_status(commander_id)
         return status.was_discovered
@@ -395,6 +406,16 @@ class PlanetData:
     def set_mapped(self, value: bool, commander_id: int) -> Self:
         status = self.get_status(commander_id)
         status.mapped = value
+        self.commit()
+        return self
+
+    def mapped_at(self, commander_id: int) -> datetime | None:
+        status = self.get_status(commander_id)
+        return status.mapped_at
+
+    def set_mapped_at(self, value: datetime | None, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.mapped_at = value
         self.commit()
         return self
 
@@ -479,6 +500,16 @@ class NonBodyData:
         self.commit()
         return self
 
+    def scanned_at(self, commander_id: int) -> datetime | None:
+        status = self.get_status(commander_id)
+        return status.scanned_at
+
+    def set_scanned_at(self, value: datetime | None, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.scanned_at = value
+        self.commit()
+        return self
+
     def was_discovered(self, commander_id: int) -> bool:
         status = self.get_status(commander_id)
         return status.was_discovered
@@ -496,6 +527,16 @@ class NonBodyData:
     def set_mapped(self, value: bool, commander_id: int) -> Self:
         status = self.get_status(commander_id)
         status.mapped = value
+        self.commit()
+        return self
+
+    def mapped_at(self, commander_id: int) -> datetime | None:
+        status = self.get_status(commander_id)
+        return status.mapped_at
+
+    def set_mapped_at(self, value: datetime | None, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.mapped_at = value
         self.commit()
         return self
 
@@ -647,6 +688,16 @@ class StarData:
     def set_discovered(self, value: bool, commander_id: int) -> Self:
         status = self.get_status(commander_id)
         status.discovered = value
+        self.commit()
+        return self
+
+    def scanned_at(self, commander_id: int) -> datetime | None:
+        status = self.get_status(commander_id)
+        return status.scanned_at
+
+    def set_scanned_at(self, value: datetime | None, commander_id: int) -> Self:
+        status = self.get_status(commander_id)
+        status.scanned_at = value
         self.commit()
         return self
 

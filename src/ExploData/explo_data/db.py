@@ -10,7 +10,7 @@ from typing import Optional
 
 import sqlalchemy.exc
 from sqlalchemy import ForeignKey, String, UniqueConstraint, select, Column, Float, Engine, text, Integer, Boolean, \
-    MetaData, Executable, Result, create_engine, event, DefaultClause, DateTime, func
+    Text, MetaData, Executable, Result, create_engine, event, DefaultClause, DateTime, func
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, scoped_session, sessionmaker, Session
 from sqlalchemy.sql import sqltypes
@@ -99,6 +99,7 @@ class SystemStatus(Base):
     honked: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     fully_scanned: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     fully_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+
     __table_args__ = (UniqueConstraint('system_id', 'commander_id', name='_system_commander_constraint'),
                       )
 
@@ -113,7 +114,6 @@ class Star(Base):
     body_id: Mapped[int]
     statuses: Mapped[list['StarStatus']] = relationship(backref='status', passive_deletes=True)
     rings: Mapped[list['StarRing']] = relationship(backref='ring', passive_deletes=True)
-    scans: Mapped[list['StarScans']] = relationship(backref='scan', passive_deletes=True)
     distance: Mapped[Optional[float]]
     mass: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
     rotation: Mapped[float] = mapped_column(default=0.0, server_default=text('0.0'))
@@ -121,6 +121,7 @@ class Star(Base):
     type: Mapped[str] = mapped_column(default='', server_default='')
     subclass: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     luminosity: Mapped[str] = mapped_column(default='', server_default='')
+
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
                       )
 
@@ -146,6 +147,8 @@ class StarStatus(Base):
     discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_discovered: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     scan_state: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    scanned_at: Mapped[Optional[datetime]]
+
     __table_args__ = (UniqueConstraint('star_id', 'commander_id', name='_star_commander_constraint'),
                       )
 
@@ -181,7 +184,6 @@ class Planet(Base):
     floras: Mapped[list['PlanetFlora']] = relationship(backref='flora', passive_deletes=True)
     geos: Mapped[list['PlanetGeo']] = relationship(backref='geo', passive_deletes=True)
     rings: Mapped[list['PlanetRing']] = relationship(backref='ring', passive_deletes=True)
-    scans: Mapped[list['PlanetScans']] = relationship(backref='scan', passive_deletes=True)
 
     __table_args__ = (UniqueConstraint('system_id', 'name', 'body_id', name='_system_name_id_constraint'),
                       )
@@ -201,6 +203,9 @@ class PlanetStatus(Base):
     was_footfalled: Mapped[Optional[bool]] = mapped_column(default=False, nullable=True)
     efficient: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     scan_state: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    scanned_at: Mapped[Optional[datetime]]
+    mapped_at: Mapped[Optional[datetime]]
+
     __table_args__ = (UniqueConstraint('planet_id', 'commander_id', name='_planet_commander_constraint'),
                       )
 
@@ -212,6 +217,7 @@ class PlanetGas(Base):
     planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
     gas_name: Mapped[str]
     percent: Mapped[float]
+
     __table_args__ = (UniqueConstraint('planet_id', 'gas_name', name='_planet_gas_constraint'), )
 
     def __repr__(self) -> str:
@@ -257,25 +263,6 @@ class PlanetRing(Base):
                       )
 
 
-class StarScans(Base):
-    __tablename__ = 'star_scans'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    star_id: Mapped[int] = mapped_column(ForeignKey('stars.id', ondelete="CASCADE"))
-    time: Mapped[datetime] = mapped_column(server_default=func.now())
-
-
-class PlanetScans(Base):
-    __tablename__ = 'planet_scans'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
-    planet_id: Mapped[int] = mapped_column(ForeignKey('planets.id', ondelete="CASCADE"))
-    scan_level: Mapped[int] = mapped_column(default=0, server_default=text('0'))
-    time: Mapped[datetime] = mapped_column(server_default=func.now())
-
-
 class FloraScans(Base):
     __tablename__ = 'flora_scans'
 
@@ -284,7 +271,8 @@ class FloraScans(Base):
     flora_id: Mapped[int] = mapped_column(ForeignKey('planet_flora.id', ondelete="CASCADE"))
     count: Mapped[int] = mapped_column(default=0, server_default=text('0'))
     was_logged: Mapped[Optional[bool]] = mapped_column(default=False, nullable=True)
-    time: Mapped[datetime] = mapped_column(server_default=func.now())
+    scanned_at: Mapped[Optional[datetime]] = mapped_column(server_default=func.now())
+
     __table_args__ = (UniqueConstraint('commander_id', 'flora_id', name='_cmdr_flora_constraint'),
                       )
 
@@ -325,6 +313,8 @@ class NonBodyStatus(Base):
     mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     was_mapped: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
     efficient: Mapped[bool] = mapped_column(default=False, server_default=text('FALSE'))
+    scanned_at: Mapped[Optional[datetime]]
+    mapped_at: Mapped[Optional[datetime]]
 
     __table_args__ = (UniqueConstraint('non_body_id', 'commander_id', name='_nonbody_commander_constraint'),
                       )
@@ -337,7 +327,51 @@ class CodexScans(Base):
     commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
     region: Mapped[int]
     biological: Mapped[str] = mapped_column(default='', server_default='')
+
     __table_args__ = (UniqueConstraint('commander_id', 'region', 'biological', name='_cmdr_bio_region_constraint'),)
+
+
+class Death(Base):
+    __tablename__ = 'deaths'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    in_ship: Mapped[bool] = mapped_column(default=True, server_default=text('TRUE'))
+    died_at: Mapped[datetime]
+
+    __table_args__ = (UniqueConstraint('commander_id', 'died_at', name='_commander_died_at'),)
+
+
+class Resurrection(Base):
+    __tablename__ = 'resurrections'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    type: Mapped[str] = mapped_column(String(32))
+    resurrected_at: Mapped[datetime]
+
+    __table_args__ = (UniqueConstraint('commander_id', 'resurrected_at', name='_commander_resurrected_at'),)
+
+
+class ExoBioSale(Base):
+    __tablename__ = 'exobio_sales'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    sold_at: Mapped[datetime]
+
+    __table_args__ = (UniqueConstraint('commander_id', 'sold_at', name='_commander_sold_at'),)
+
+
+class SystemSale(Base):
+    __tablename__ = 'system_sales'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    commander_id: Mapped[int] = mapped_column(ForeignKey('commanders.id', ondelete="CASCADE"))
+    systems: Mapped[str] = mapped_column(Text())
+    sold_at: Mapped[datetime]
+
+    __table_args__ = (UniqueConstraint('commander_id', 'sold_at', name='_commander_sold_at'),)
 
 
 """
@@ -548,7 +582,16 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'planet_status', Column('footfall', Boolean(), nullable=False, server_default=text('FALSE')))
                 add_column(engine, 'planet_status', Column('was_footfalled', Boolean(), nullable=True))
                 add_column(engine, 'flora_scans', Column('was_logged', Boolean(), nullable=True))
+            if int(version['value']) < 11:
+                add_column(engine, 'star_status', Column('scanned_at', DateTime(), nullable=True))
+                add_column(engine, 'planet_status', Column('scanned_at', DateTime(), nullable=True))
+                add_column(engine, 'planet_status', Column('mapped_at', DateTime(), nullable=True))
+                add_column(engine, 'flora_scans', Column('scanned_at', DateTime(), nullable=True))
+                add_column(engine, 'non_body_status', Column('scanned_at', DateTime(), nullable=True))
+                add_column(engine, 'non_body_status', Column('mapped_at', DateTime(), nullable=True))
                 run_query(engine, 'DELETE FROM journal_log')
+                affix_schemas(engine)  # This should be run on the latest migration
+            if int(version['value']) < 12:
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
