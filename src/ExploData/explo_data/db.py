@@ -591,8 +591,6 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'non_body_status', Column('mapped_at', DateTime(), nullable=True))
                 run_query(engine, 'DELETE FROM journal_log')
                 affix_schemas(engine)  # This should be run on the latest migration
-            if int(version['value']) < 12:
-                affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:
         run_statement(engine, insert(Metadata).values(key='version', value=database_version)
                       .on_conflict_do_update(index_elements=['key'], set_=dict(value=1)))

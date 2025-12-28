@@ -188,6 +188,7 @@ bio_color_suffix_map = {
     'D': 'star',
     'N': 'star',
     'H': 'star',
+    'Ae': 'star',
     'Antimony': 'element',
     'Polonium': 'element',
     'Ruthenium': 'element',

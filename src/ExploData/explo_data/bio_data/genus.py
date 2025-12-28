@@ -41,7 +41,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Red',
                         'Y': 'Mauve',
                         'TTS': 'Maroon',
-                        'AeBe': 'Orange',
+                        'Ae': 'Orange',
                         'W': 'Amethyst',
                         'D': 'Ocher',
                         'N': 'Indigo'
@@ -100,7 +100,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Red',
                         'Y': 'Mauve',
                         'TTS': 'Maroon',
-                        'AeBe': 'Orange',
+                        'Ae': 'Orange',
                         'W': 'Amethyst',
                         'D': 'Ocher',
                         'N': 'Indigo'
@@ -169,7 +169,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Red',
                         'Y': 'Mauve',
                         'TTS': 'Maroon',
-                        'AeBe': 'Orange',
+                        'Ae': 'Orange',
                         'W': 'Amethyst',
                         'D': 'Ocher',
                         'N': 'Indigo'
@@ -335,7 +335,7 @@ data: Mapping[str, Mapping[str, any]] = {
                 'W': 'Indigo',
                 'D': 'Turquoise',
                 'N': 'Sage',
-                'AeBe': 'Maroon'
+                'Ae': 'Maroon'
             }
         }
     },
@@ -533,7 +533,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'Y': 'Lime',
                         'TTS': 'Sage',
                         'L': 'Ocher',
-                        'AeBe': 'Grey',
+                        'Ae': 'Grey',
                         'D': 'Yellow',
                         'N': 'Emerald'
                     }
@@ -598,7 +598,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
@@ -612,7 +612,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
@@ -626,7 +626,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
@@ -647,7 +647,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
@@ -661,7 +661,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
@@ -675,7 +675,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
@@ -689,7 +689,7 @@ data: Mapping[str, Mapping[str, any]] = {
                         'T': 'Grey',
                         'TTS': 'Amethyst',
                         'D': 'Mauve',
-                        'AeBe': 'Teal',
+                        'Ae': 'Teal',
                         'W': 'Red'
                     }
                 },
