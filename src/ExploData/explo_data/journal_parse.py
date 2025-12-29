@@ -69,7 +69,7 @@ class JournalParse:
         self._session: Session = session
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
-        self._in_ship: bool = False
+        self._in_ship: bool = True
 
     def parse_journal(self, journal: Path, event: Event) -> int:
         """
