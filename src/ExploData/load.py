@@ -4,7 +4,7 @@
 # Licensed under the [GNU Public License (GPL)](http://www.gnu.org/licenses/gpl-2.0.html) version 2 or later.
 
 import tkinter as tk
-from typing import Optional, Mapping, MutableMapping
+from typing import Optional, Mapping, MutableMapping, Any
 
 from EDMCLogging import get_plugin_logger
 
@@ -65,7 +65,7 @@ def plugin_stop():
 
 
 def journal_entry(
-        cmdr: str, is_beta: bool, system: str, station: str, entry: Mapping[str, any], state: MutableMapping[str, any]
+        cmdr: str, is_beta: bool, system: str, station: str, entry: Mapping[str, Any], state: MutableMapping[str, Any]
 ) -> str:
     """
     EDMC journal entry hook. Primary journal data handler.
@@ -85,7 +85,7 @@ def journal_entry(
 
     this.journal_processor.set_cmdr(cmdr)
     this.journal_processor.set_system(system, state['StarPos'])
-    this.journal_processor.process_entry(entry)
+    this.journal_processor.process_entry(entry, state)
     ExploData.explo_data.journal_parse.fire_event_callbacks(entry)
 
     return ''

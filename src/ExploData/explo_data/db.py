@@ -83,6 +83,7 @@ class System(Base):
     region: Mapped[Optional[int]]
     body_count: Mapped[int] = mapped_column(default=1, server_default=text('1'))
     non_body_count: Mapped[int] = mapped_column(default=0, server_default=text('0'))
+    population: Mapped[int] = mapped_column(default=0, server_default=text('0'))
 
     statuses: Mapped[list['SystemStatus']] = relationship(backref='status', passive_deletes=True)
     planets: Mapped[list['Planet']] = relationship(backref='planet', passive_deletes=True)
@@ -589,6 +590,9 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'flora_scans', Column('scanned_at', DateTime(), nullable=True))
                 add_column(engine, 'non_body_status', Column('scanned_at', DateTime(), nullable=True))
                 add_column(engine, 'non_body_status', Column('mapped_at', DateTime(), nullable=True))
+                run_query(engine, 'DELETE FROM journal_log')
+            if int(version['value']) < 12:
+                add_column(engine, 'systems', Column('population', Integer(), nullable=False, server_default=text('0')))
                 run_query(engine, 'DELETE FROM journal_log')
                 affix_schemas(engine)  # This should be run on the latest migration
     except ValueError as ex:

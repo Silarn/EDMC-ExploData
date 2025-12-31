@@ -15,7 +15,7 @@ from os.path import expanduser
 from pathlib import Path
 from time import sleep
 from threading import Event
-from typing import Any, BinaryIO, Callable, Mapping, Optional
+from typing import Any, BinaryIO, Callable, Mapping, Optional, MutableMapping
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError as AlcIntegrityError
@@ -70,6 +70,7 @@ class JournalParse:
         self._cmdr: Optional[Commander] = None
         self._system: Optional[System] = None
         self._in_ship: bool = True
+        self._system_pop: int = 0
 
     def parse_journal(self, journal: Path, event: Event) -> int:
         """
@@ -130,14 +131,17 @@ class JournalParse:
             return 1
         return 0
 
-    def process_entry(self, entry: Mapping[str, Any]) -> None:
+    def process_entry(self, entry: Mapping[str, Any], state: MutableMapping[str, Any] | None = None) -> None:
         """
         Main journal entry processor. Parses important events and submits the appropriate data objects to the database.
 
         :param entry: JSON object of the current journal line
+        :param state: (Optional) EDMC state
         """
         event_type = entry['event'].lower()
         timestamp: datetime = datetime.fromisoformat(entry['timestamp'])
+        if state:
+            self._system_pop = state.get('SystemPopulation', 0)
         match event_type:
             case 'loadgame':
                 self._session.close()
@@ -147,6 +151,8 @@ class JournalParse:
                 self.set_cmdr(entry['Name'])
             case 'location' | 'fsdjump' | 'carrierjump':
                 self._session.close()
+                if not state or 'SystemPopulation' not in state:
+                    self._system_pop = entry.get('Population', 0)
                 self.set_system(entry['StarSystem'], entry.get('StarPos', None))
                 self._in_ship = True if not entry.get('InSRV', False) and not entry.get('OnFoot', False) else False
             case 'scan':
@@ -385,6 +391,7 @@ class JournalParse:
         self._system.x = address[0]
         self._system.y = address[1]
         self._system.z = address[2]
+        self._system.population = self._system_pop
         region = findRegion(self._system.x, self._system.y, self._system.z)
         if region:
             self._system.region = region[0]
