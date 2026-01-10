@@ -590,7 +590,6 @@ DELETE FROM planets WHERE ROWID IN (
                 add_column(engine, 'flora_scans', Column('scanned_at', DateTime(), nullable=True))
                 add_column(engine, 'non_body_status', Column('scanned_at', DateTime(), nullable=True))
                 add_column(engine, 'non_body_status', Column('mapped_at', DateTime(), nullable=True))
-                run_query(engine, 'DELETE FROM journal_log')
             if int(version['value']) < 12:
                 add_column(engine, 'systems', Column('population', Integer(), nullable=False, server_default=text('0')))
                 run_query(engine, 'DELETE FROM journal_log')
