@@ -19,6 +19,8 @@ The data currently being collected by this plugin includes:
 - Asteroid belts and rings (stellar and planetary)
 - Non-body Objects (asteroid clusters)
 - Flora (type, location, scan status)
+- Exploration and bio data sales (timestamp, system)
+- Deaths & Ressurections (timestamp, type, in or out of ship)
 - Codex Entries (for biological signals)
 
 ### Location
