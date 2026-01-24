@@ -25,6 +25,8 @@ class This:
         self.journal_processor: Optional[JournalParse] = None
 
 
+__version__ = explo_data.const.plugin_version
+
 this = This()
 logger = get_plugin_logger(this.NAME)
 
