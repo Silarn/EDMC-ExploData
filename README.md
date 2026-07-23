@@ -51,6 +51,10 @@ which make use of the data.
 Installation instructions will generally be provided by plugins that use ExploData. It should be installed alongside
 the companion plugins and must be named `ExploData` or you may run into import errors.
 
+**Use the version bundled with the BioScan / Pioneer (or other plugin) release. The codebase here may not be fully
+compatible with your release, and you will need to ensure the SQLAlchemy dependencies are available. This is done
+for you with the Windows EXE and Flatpak versions available on the BioScan / Pioneer plugin release pages.**
+
 [EDMC]: https://github.com/EDCD/EDMarketConnector/wiki
 [BioScan]: https://github.com/Silarn/EDMC-BioScan
 [Pioneer]: https://github.com/Silarn/EDMC-Pioneer
