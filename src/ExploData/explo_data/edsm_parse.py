@@ -19,6 +19,7 @@ from ExploData.explo_data import const
 from .db import System, get_session, Star
 from .body_data.struct import PlanetData, StarData
 from .body_data.edsm import parse_edsm_star_class, parse_edsm_ring_class, map_edsm_type, map_edsm_atmosphere
+from .util import generate_user_agent
 
 
 class This:
@@ -58,7 +59,7 @@ class EDSMFetch:
     def __init__(self, session: Session):
         self._session: Session = session
         self._system: Optional[System] = None
-        self._edsm_session: str | None = None
+        self._edsm_session: requests.Session | None = None
         self._edsm_bodies: Mapping | None = None
 
     def edsm_fetch(self, system_name: str) -> None:
@@ -72,13 +73,14 @@ class EDSMFetch:
 
     def edsm_worker(self, system_name: str) -> None:
         """ Fetch system data from EDSM on a threaded function """
-    
+
+        url = 'https://www.edsm.net/api-system-v1/bodies?systemName=%s' % quote(system_name)
+        headers = {'User-Agent': generate_user_agent()}
         if not self._edsm_session:
             self._edsm_session = requests.Session()
     
         try:
-            r = self._edsm_session.get('https://www.edsm.net/api-system-v1/bodies?systemName=%s' % quote(system_name),
-                                      timeout=10)
+            r = self._edsm_session.get(url, headers=headers, timeout=10)
             r.raise_for_status()
             self._edsm_bodies = r.json() or {}
         except requests.exceptions.RequestException:
